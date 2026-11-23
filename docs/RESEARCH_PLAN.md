@@ -95,3 +95,19 @@ Phases R1–R5 parallelizable (independent agents). R6 depends on all.
 
 **Dropped (round 1 marks):** calendar view + overlay, weekly review, AI triage, voice, watch, capture-bar widget, templates, formula fields, self-hosted sync.
 **Open (round 2 page):** deadline/priority/project syntax, drag rule, deadline-pins-task rule, custom field entry, deps UI, density, rolling vs calendar lanes.
+
+## Round 3 inputs: external design review (2026-11-23, 2 independent reviewers)
+
+Fixed already: day/month words matched inside titles ("Buy sunscreen" → Sunday); drag ignored cascade-off.
+
+Both reviewers flagged, ranked:
+1. **Task detail is the missing rung.** Edit both dates, clear metadata, recurrence, blockers, all without syntax.
+2. **Recognition must be reversible.** Tap a chip → edit / remove / "Keep as title". Quotes stay an expert shortcut.
+3. **Filter ≠ destination.** Only lanes with a defined move action accept drops (inferred for date presets). Preview the resulting date or refusal *during* drag; mark pinned cards.
+4. **Account for every task.** Undated and >90d tasks vanish from Horizons. Add an "Outside this view" count; Inbox = unfiled, not undated.
+5. **Simple tab too thin.** Add priority / label / field conditions; keep the last valid query while editing.
+6. **Cascade hides meaning.** "Next 30 days" really = days 8–30. Show effective ranges.
+7. **Intention vs obligation.** Consider planning lanes by scheduled date by default and deadlines shown, not placing. Split "planned yesterday" from "deadline yesterday" so Today ≠ guilt bucket.
+8. **Date contract.** fri-on-Friday, by vs before, repeated tokens. Show the resolved date; flag conflicts.
+9. **Conservative metadata.** Known fields only; `p1` alias optional (incident titles).
+10. **Measure flows, not taps.** 50 real titles → capture → correct → find → reschedule on a phone.

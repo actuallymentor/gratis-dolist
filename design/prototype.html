@@ -681,7 +681,10 @@ function parseDate(s) {
    Quick-add parser — words first, cheap prefixes second
    ════════════════════════════════════════════════════════════ */
 
-const DATE = String.raw`(?:today|tod|tomorrow|tmr|in \d+ (?:days?|d|weeks?|w|months?)|next (?:week|month)|(?:next )?(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d{1,2} (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)`
+// Exact day/month words only: "sunscreen", "monitor", "monthly" must stay in titles
+const DAYS   = String.raw`(?:mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)`
+const MONTHS = String.raw`(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)`
+const DATE = String.raw`(?:today|tod|tomorrow|tmr|in \d+ (?:days?|d|weeks?|w|months?)|next (?:week|month)|(?:next )?${DAYS}|\d{1,2} ${MONTHS})`
 const B = String.raw`(?<=^|\s)`, E = String.raw`(?=$|\s)`
 
 // Order matters: earlier rules claim text first
@@ -1059,17 +1062,19 @@ boardEl.addEventListener("drop", e => {
 
 function moveToLane(t, target) {
   const fns = compiled()
-  if (laneOf(t, fns) === target) return render()
+  // "Show each task once" on → first match wins; off → any lane whose rule matches
+  const fits = c => view.once ? laneOf(c, fns) === target : fns[target].fn(c)
+  if (fits(t)) return render()
 
-  // Deadline alone pins it to an earlier lane → rescheduling can't move it
+  // Deadline alone pins it to an earlier lane → rescheduling can't move it (cascade only)
   const byDeadline = laneOf({ ...t, due: null }, fns)
-  if (byDeadline !== -1 && byDeadline < target) {
+  if (view.once && byDeadline !== -1 && byDeadline < target) {
     render()
     return toast(`Its deadline (${fmt(t.deadline)}) keeps it in ${view.lanes[byDeadline].name}`)
   }
   for (let d = 0; d <= 400; d++) {
     const cand = { ...t, due: addD(d) }
-    if (laneOf(cand, fns) === target) {
+    if (fits(cand)) {
       const before = t.due
       t.due = cand.due
       render()
