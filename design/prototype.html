@@ -902,10 +902,14 @@ function renderRecipe() {
 /* ── popovers (one at a time) ───────────────────────────── */
 
 let pop = null
+// Clear `pop` before removing: removal blurs a focused input, whose change
+// handler may re-enter closePop/openPop. The `closing` flag makes those no-ops.
 function closePop() {
-  pop?.el.remove()
-  pop?.btn.setAttribute("aria-expanded", "false")
+  const p = pop; if (!p) return
   pop = null
+  p.el.closing = true
+  p.btn.setAttribute("aria-expanded", "false")
+  p.el.remove()
 }
 function openPop(btn, html, onMount) {
   const same = pop?.btn === btn
@@ -922,7 +926,8 @@ function openPop(btn, html, onMount) {
   pop = { el, btn }
   onMount?.(el)
 }
-document.addEventListener("click", e => { if (pop && pop.el.isConnected && !pop.el.contains(e.target) && !pop.btn.contains(e.target)) closePop() })
+// Ignore clicks on nodes a handler already swapped out (e.g. tab switch re-renders the pop)
+document.addEventListener("click", e => { if (pop && e.target.isConnected && pop.el.isConnected && !pop.el.contains(e.target) && !pop.btn.contains(e.target)) closePop() })
 document.addEventListener("keydown", e => { if (e.key === "Escape" && pop) { pop.btn.focus(); closePop() } })
 
 /* ── view settings ──────────────────────────────────────── */
@@ -987,10 +992,15 @@ function laneEditor(i, btn, tab) {
     el => {
       el.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { closePop(); laneEditor(i, btn, b.dataset.tab) })
       const upd = () => {
+        if (el.closing) return
         if (el.querySelector("#lWhich")) {
           const p = el.querySelector("#lProj").value
-          lane.query = `${el.querySelector("#lWhich").value}:${el.querySelector("#lWithin").value}${p ? " #" + p : ""}`
+          const within = el.querySelector("#lWithin").value
+          const label  = v => WITHIN.find(w => w[0] === v)?.[1]
+          lane.query = `${el.querySelector("#lWhich").value}:${within}${p ? " #" + p : ""}`
           lane.name  = el.querySelector("#lName").value || lane.name
+          // Preset names follow the period; custom names are left alone
+          if (lane.name === label(simple[2])) lane.name = label(within)
         }
         lane.sort = el.querySelector("#lSort").value
         reopen(i, tab)
@@ -998,7 +1008,7 @@ function laneEditor(i, btn, tab) {
       el.querySelectorAll("select").forEach(s => s.onchange = upd)
       el.querySelector("#lName")?.addEventListener("change", upd)
       const q = el.querySelector("#lQuery")
-      q?.addEventListener("change", () => { lane.query = q.value.trim(); reopen(i, "text") })
+      q?.addEventListener("change", () => { if (el.closing) return; lane.query = q.value.trim(); reopen(i, "text") })
       q?.addEventListener("keydown", ev => { if (ev.key === "Enter") q.dispatchEvent(new Event("change")) })
     })
 }
