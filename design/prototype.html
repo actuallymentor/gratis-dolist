@@ -1,0 +1,1155 @@
+<title>Sift Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Nunito:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky section nav → long scroll of review sections; each reviewable thing carries a want/maybe/nope pin */
+:root {
+  --page: #fafbfc; --surface: #ffffff; --sunk: #f1f4f6; --line: #e3e8ec;
+  --fg: #1a1a2e; --muted: #6b7280;
+  --accent: #7ec0d0; --accent-strong: #376675; --accent-tint: #7ec0d026;
+  --p1: #d0603e; --p2: #b8860b; --p3: #376675; --p4: #9aa3ad;
+  --ok: #2f8a5b; --warn: #b8860b; --bad: #c2453a; --bad-tint: #c2453a14;
+  --font-head: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-meta: "Nunito", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --radius: 10px; --radius-sm: 6px; --row-pad: .6rem .75rem; --card-shadow: 0 1px 2px #1a1a2e0f;
+  --ease: cubic-bezier(.2,.8,.2,1);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652;
+  --fg: #e6ecf0; --muted: #aab6c1; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
+  --p1: #e98a6a; --p2: #f0c040; --p3: #7ec0d0; --p4: #6f8792;
+  --ok: #5cc28a; --warn: #f0c040; --bad: #ef7d70; --bad-tint: #ef7d7018; --card-shadow: none;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652;
+  --fg: #e6ecf0; --muted: #aab6c1; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
+  --p1: #e98a6a; --p2: #f0c040; --p3: #7ec0d0; --p4: #6f8792;
+  --ok: #5cc28a; --warn: #f0c040; --bad: #ef7d70; --bad-tint: #ef7d7018; --card-shadow: none;
+  color-scheme: dark }
+
+/* Style direction B: "Ledger" — dense, square, mono metadata, keyboard-first */
+[data-look="ledger"] {
+  --radius: 3px; --radius-sm: 2px; --row-pad: .35rem .55rem; --card-shadow: none;
+  --font-meta: var(--font-mono);
+}
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+html { font-size: 100% }
+body {
+  background: var(--page); color: var(--fg); font: 400 1rem/1.5 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 4rem;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--page) }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 500; text-wrap: balance; margin: 0 }
+h2 { font-size: 1.625rem }
+h3 { font-size: 1.05rem; font-weight: 600 }
+p { margin: 0 }
+a { color: var(--accent-strong) }
+button { font: inherit; color: inherit }
+:focus-visible { outline: none; box-shadow: 0 0 0 5px var(--accent-tint), 0 0 0 1px var(--accent) }
+.wrap { max-width: 1240px; margin: 0 auto }
+.muted { color: var(--muted) }
+.mono { font-family: var(--font-mono); font-size: .85em }
+.icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none }
+.icon.lg { width: 20px; height: 20px }
+
+/* ── top bar ─────────────────────────────────────────── */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--page);
+  border-bottom: 1px solid var(--line); margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding: 0 max(16px, env(safe-area-inset-left, 0px));
+}
+.top .wrap { display: flex; align-items: center; gap: 1.5rem; min-height: 56px; flex-wrap: wrap }
+.brand { display: flex; align-items: center; gap: .5rem; font-family: var(--font-head); font-weight: 600; font-size: 1.1rem }
+.brand svg { color: var(--accent-strong) }
+.nav { display: flex; gap: .25rem; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: none }
+.nav a { color: var(--muted); text-decoration: none; padding: .9rem .6rem; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; transition: color .16s }
+.nav a:hover, .nav a.on { color: var(--fg); border-color: var(--accent) }
+.top-tools { display: flex; gap: .5rem; align-items: center }
+
+/* ── buttons, pills ─────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: .4rem; height: 32px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: .92rem; transition: transform .16s, background .16s;
+}
+.btn:hover { background: var(--sunk) }
+.btn:active { transform: scale(.985) }
+.btn.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff }
+:root[data-theme="dark"] .btn.primary { color: #002b36 }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #002b36 } }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface) }
+.seg button { border: 0; background: none; padding: .2rem .75rem; border-radius: 999px; cursor: pointer; font-size: .85rem; color: var(--muted) }
+.seg button.on { background: var(--accent-tint); color: var(--fg); font-weight: 600 }
+
+/* ── sections ─────────────────────────────────────────── */
+section { padding-block: 3rem 1rem; scroll-margin-top: 64px }
+section + section { border-top: 1px solid var(--line) }
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem }
+.sec-head p { max-width: 65ch; color: var(--muted); margin-top: .35rem }
+.eyebrow { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600 }
+
+/* ── feedback pin ─────────────────────────────────────── */
+.fb { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px dashed var(--line); border-radius: 999px; background: var(--surface); vertical-align: middle; flex: none }
+.fb button { display: inline-flex; align-items: center; gap: .25rem; border: 0; background: none; cursor: pointer; padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; color: var(--muted); min-height: 26px }
+.fb button:hover { background: var(--sunk); color: var(--fg) }
+.fb button[aria-pressed="true"][data-v="want"] { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); font-weight: 700 }
+.fb button[aria-pressed="true"][data-v="maybe"] { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); font-weight: 700 }
+.fb button[aria-pressed="true"][data-v="nope"] { background: var(--bad-tint); color: var(--bad); font-weight: 700 }
+.fb .icon { width: 13px; height: 13px }
+body.no-pins .fb { display: none }
+.pinrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap }
+
+/* ── philosophy ────────────────────────────────────────── */
+.principles { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden }
+.principle { background: var(--surface); padding: 1.1rem 1.2rem; display: grid; gap: .45rem; align-content: start }
+.principle p { color: var(--muted); font-size: .95rem }
+.recipe-flow { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 1.5rem 0 0; font-family: var(--font-mono); font-size: .85rem }
+.recipe-flow span { padding: .35rem .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface) }
+.recipe-flow i { color: var(--muted); font-style: normal }
+.plan { margin-top: 2rem; display: grid; gap: .5rem }
+.plan-row { display: grid; grid-template-columns: 3rem 1fr; gap: 1rem; padding: .75rem 0; border-top: 1px solid var(--line) }
+.plan-row b { font-family: var(--font-mono); color: var(--accent-strong); font-weight: 500 }
+.plan-row p { color: var(--muted); font-size: .95rem }
+.plan-row h3 { margin-bottom: .15rem }
+
+/* ── desktop app frame ────────────────────────────────── */
+.device { border: 1px solid var(--line); border-radius: 14px; background: var(--page); overflow: hidden; box-shadow: 0 8px 30px #1a1a2e12 }
+.chrome { display: flex; align-items: center; gap: .4rem; padding: .55rem .8rem; border-bottom: 1px solid var(--line); background: var(--surface) }
+.chrome i { width: 10px; height: 10px; border-radius: 50%; background: var(--line) }
+.chrome .url { margin-left: .75rem; font-family: var(--font-mono); font-size: .75rem; color: var(--muted) }
+.app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 640px }
+.side { border-right: 1px solid var(--line); background: var(--surface); padding: 1rem .6rem; display: flex; flex-direction: column; gap: 1.1rem; font-size: .92rem }
+.side h4 { margin: 0 0 .25rem .55rem; font: 600 .7rem/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.side a { display: flex; align-items: center; gap: .55rem; padding: .38rem .55rem; border-radius: var(--radius-sm); color: var(--fg); text-decoration: none; cursor: pointer }
+.side a:hover { background: var(--sunk) }
+.side a.on { background: var(--accent-tint); font-weight: 600 }
+.side a .n { margin-left: auto; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums }
+.side .dot { width: 8px; height: 8px; border-radius: 50%; margin: 0 4px }
+.main { min-width: 0; display: flex; flex-direction: column }
+.toolbar { display: flex; align-items: center; gap: .75rem; padding: .9rem 1.1rem .6rem; flex-wrap: wrap }
+.toolbar h3 { font-size: 1.25rem; font-weight: 500; font-family: var(--font-head) }
+.toolbar .grow { flex: 1 }
+
+/* ── quick add ─────────────────────────────────────────── */
+.qa { margin: 0 1.1rem .75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: .55rem .7rem; display: grid; gap: .45rem; transition: box-shadow .16s }
+.qa:focus-within { box-shadow: 0 0 0 5px var(--accent-tint); border-color: var(--accent) }
+.qa-line { display: flex; align-items: center; gap: .55rem }
+.qa-field { position: relative; flex: 1; min-width: 0 }
+.qa-field input, .qa-field .hl { font: 500 1rem/1.5 var(--font-body); padding: .2rem 0; width: 100%; border: 0; white-space: pre; letter-spacing: normal; word-spacing: normal }
+.qa-field input { position: relative; background: transparent; color: transparent; caret-color: var(--fg); outline: none; z-index: 1 }
+.qa-field input::placeholder { color: var(--muted) }
+.qa-field .hl { position: absolute; inset: 0; pointer-events: none; color: var(--fg); overflow: hidden }
+.hl mark { background: none; border-radius: 4px; box-shadow: inset 0 -2px 0 currentColor }
+.k-proj { color: var(--accent-strong) } .k-label { color: var(--p2) } .k-prio { color: var(--p1) }
+.k-due { color: var(--ok) } .k-deadline { color: var(--bad) } .k-time { color: var(--ok) }
+.chips { display: flex; gap: .35rem; flex-wrap: wrap; min-height: 24px }
+.chip { display: inline-flex; align-items: center; gap: .3rem; font: 500 .78rem/1 var(--font-meta); padding: .3rem .5rem; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap }
+.chip .icon { width: 12px; height: 12px }
+.chip.proj { color: var(--accent-strong) } .chip.label { color: var(--p2) } .chip.due { color: var(--ok) } .chip.deadline { color: var(--bad) }
+.chip.overdue { color: var(--bad); background: var(--bad-tint) }
+.qa-help { font-size: .78rem; color: var(--muted); display: flex; gap: .9rem; flex-wrap: wrap }
+.qa-help code { font-family: var(--font-mono); color: var(--fg) }
+kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--surface); color: var(--muted) }
+
+/* ── board ────────────────────────────────────────────── */
+.boardbar { display: flex; align-items: center; gap: .75rem; padding: 0 1.1rem .75rem; flex-wrap: wrap; font-size: .85rem }
+.switch { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; user-select: none }
+.switch input { appearance: none; width: 32px; height: 18px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .16s; margin: 0 }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); transition: transform .16s var(--ease); box-shadow: 0 1px 2px #0003 }
+.switch input:checked { background: var(--accent-strong) }
+.switch input:checked::after { transform: translateX(14px) }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: .75rem; padding: 0 1.1rem 1.1rem; overflow-x: auto; align-items: start; flex: 1 }
+.col { background: var(--sunk); border-radius: var(--radius); padding: .6rem; display: flex; flex-direction: column; gap: .45rem; min-width: 0 }
+.col-head { display: flex; align-items: center; gap: .4rem; padding: .1rem .2rem }
+.col-head h3 { font-size: .95rem }
+.col-head .n { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums }
+.col-head select { margin-left: auto; font: 500 .75rem var(--font-body); border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: .15rem .4rem; cursor: pointer }
+.q { display: flex; align-items: center; gap: .35rem; font-family: var(--font-mono); font-size: .76rem; padding: .3rem .5rem; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); color: var(--muted); cursor: text; min-width: 0 }
+.q input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; color: var(--fg); outline: none; padding: 0 }
+.q.err { border-color: var(--bad); background: var(--bad-tint) }
+.q-err { font-size: .72rem; color: var(--bad); padding: 0 .2rem }
+.card { background: var(--surface); border-radius: var(--radius-sm); padding: var(--row-pad); box-shadow: var(--card-shadow); border: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr; gap: .15rem .55rem; align-items: start; transition: opacity .3s, transform .3s var(--ease) }
+.card:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)) }
+.card.done { opacity: 0; transform: translateX(8px) }
+.card .t { font-size: .92rem; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere }
+.card .meta { grid-column: 2; display: flex; gap: .3rem; flex-wrap: wrap }
+.card .meta .chip { padding: .2rem .4rem; font-size: .72rem }
+.check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--p4); background: none; cursor: pointer; margin-top: 1px; padding: 0; position: relative }
+.check::after { content: ""; position: absolute; inset: 0; margin: auto; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0; transition: opacity .16s }
+.check:hover::after { opacity: .35 }
+.check.p1 { border-color: var(--p1); color: var(--p1); background: color-mix(in srgb, var(--p1) 10%, transparent) }
+.check.p2 { border-color: var(--p2); color: var(--p2); background: color-mix(in srgb, var(--p2) 10%, transparent) }
+.check.p3 { border-color: var(--p3); color: var(--p3) }
+[data-look="ledger"] .check { border-radius: 2px }
+[data-look="ledger"] .card { grid-template-columns: auto 1fr auto; align-items: center }
+[data-look="ledger"] .card .meta { grid-column: auto; grid-row: 1 }
+[data-look="ledger"] .board { grid-auto-columns: minmax(270px, 1fr) }
+.empty { font-size: .82rem; color: var(--muted); padding: .8rem .4rem; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius-sm) }
+.addcol { align-self: stretch; display: flex; align-items: flex-start; justify-content: center; padding-top: .6rem; border: 1px dashed var(--line); border-radius: var(--radius); background: none; cursor: pointer; color: var(--muted); min-width: 160px }
+.addcol:hover { color: var(--fg); background: var(--sunk) }
+
+.under { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1.25rem; margin-top: 1.25rem }
+.panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 1rem 1.1rem; min-width: 0 }
+.panel h3 { margin-bottom: .5rem }
+.panel pre { margin: .5rem 0 0; font: .78rem/1.55 var(--font-mono); background: var(--sunk); padding: .75rem .9rem; border-radius: var(--radius-sm); overflow-x: auto; color: var(--fg) }
+.grammar { width: 100%; border-collapse: collapse; font-size: .85rem }
+.grammar td { padding: .4rem .3rem; border-top: 1px solid var(--line); vertical-align: top }
+.grammar td:first-child { font-family: var(--font-mono); white-space: nowrap; color: var(--accent-strong); padding-right: 1rem }
+
+/* ── mobile ────────────────────────────────────────────── */
+.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1.5rem; justify-items: center }
+.phone-wrap { display: grid; gap: .6rem; justify-items: center; width: 100% }
+.phone { width: 100%; max-width: 300px; aspect-ratio: 9 / 19; border-radius: 36px; border: 8px solid #1a1a2e; background: var(--page); overflow: hidden; position: relative; display: flex; flex-direction: column; font-size: .85rem }
+:root[data-theme="dark"] .phone { border-color: #000 }
+.statusbar { display: flex; justify-content: space-between; padding: .55rem 1.1rem .2rem; font: 600 .7rem var(--font-body) }
+.phone .notch { position: absolute; top: 6px; left: 50%; translate: -50% 0; width: 78px; height: 20px; border-radius: 999px; background: #000 }
+.home { flex: 1; padding: .9rem; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 54px; gap: .7rem; align-content: start;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 45%, var(--page)), color-mix(in srgb, var(--p1) 22%, var(--page))) }
+.appicon { border-radius: 14px; background: color-mix(in srgb, var(--surface) 70%, transparent) }
+.widget { border-radius: 20px; background: var(--surface); box-shadow: 0 4px 14px #0002; padding: .6rem .7rem; display: flex; flex-direction: column; gap: .35rem; overflow: hidden }
+.w-1x1 { grid-column: span 1; align-items: center; justify-content: center; background: var(--accent-strong); color: #fff; padding: 0 }
+.w-4x1 { grid-column: span 4; flex-direction: row; align-items: center; gap: .5rem }
+.w-4x1 .fake-in { flex: 1; color: var(--muted); font-size: .8rem }
+.w-4x1 .mic { width: 30px; height: 30px; border-radius: 50%; background: var(--sunk); display: grid; place-items: center; color: var(--accent-strong) }
+.w-2x2 { grid-column: span 2; grid-row: span 2 }
+.w-4x2 { grid-column: span 4; grid-row: span 2 }
+.widget h5 { margin: 0; font: 600 .72rem var(--font-body); color: var(--muted); display: flex; justify-content: space-between }
+.wrow { display: flex; gap: .4rem; align-items: center; font-size: .74rem; line-height: 1.25 }
+.wrow .check { width: 13px; height: 13px; margin: 0; border-width: 1.2px }
+.wrow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.wlbl { font-size: .62rem; text-align: center; color: var(--fg); grid-column: span 1; align-self: start; margin-top: -.6rem }
+.sheet-bg { flex: 1; background: color-mix(in srgb, var(--fg) 25%, var(--page)); display: flex; flex-direction: column; justify-content: flex-end }
+.sheet { background: var(--surface); border-radius: 18px 18px 0 0; padding: .9rem; display: grid; gap: .6rem }
+.sheet .grab { width: 36px; height: 4px; border-radius: 4px; background: var(--line); margin: -.3rem auto .2rem }
+.sheet .typed { font-size: .95rem; font-weight: 500; line-height: 1.4; min-height: 2.6em; overflow-wrap: anywhere }
+.sheet .acts { display: flex; gap: .4rem; color: var(--muted); align-items: center }
+.sheet .acts .send { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: var(--accent-strong); color: #fff; display: grid; place-items: center }
+.kbd { background: var(--sunk); padding: .5rem .3rem 1rem; display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px }
+.kbd i { height: 30px; border-radius: 5px; background: var(--surface); box-shadow: 0 1px 0 var(--line) }
+.kbd i.w { grid-column: span 6 } .kbd i.m { grid-column: span 2 }
+.m-head { padding: .4rem 1rem .6rem; display: flex; align-items: center; justify-content: space-between }
+.m-head h4 { margin: 0; font: 500 1.2rem var(--font-head) }
+.m-lanes { display: flex; gap: .3rem; padding: 0 .8rem .6rem; overflow-x: auto; scrollbar-width: none }
+.m-lanes button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: .25rem .6rem; font-size: .75rem; white-space: nowrap; cursor: pointer; color: var(--muted) }
+.m-lanes button.on { border-color: var(--accent); background: var(--accent-tint); color: var(--fg); font-weight: 600 }
+.m-lanes b { font-variant-numeric: tabular-nums; margin-left: .25rem; font-weight: 600 }
+.m-list { flex: 1; overflow-y: auto; padding: 0 .8rem; display: flex; flex-direction: column; gap: .4rem }
+.m-list .card { padding: .5rem .6rem }
+.m-list .card .t { font-size: .82rem }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: var(--surface); position: relative }
+.tabs span { display: grid; place-items: center; padding: .65rem 0 .9rem; color: var(--muted); border-top: 3px solid transparent; margin-top: -1px }
+.tabs span.on { color: var(--accent-strong); border-top-color: var(--accent) }
+.fab { position: absolute; right: 14px; bottom: 62px; width: 46px; height: 46px; border-radius: 50%; background: var(--accent-strong); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 16px #0003 }
+.phone-cap { text-align: center; max-width: 300px; display: grid; gap: .35rem; justify-items: center }
+.phone-cap p { font-size: .88rem; color: var(--muted) }
+
+/* ── styles ────────────────────────────────────────────── */
+.looks { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem }
+.look { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 1.1rem; display: grid; gap: .9rem; align-content: start; min-width: 0 }
+.look .swatches { display: flex; gap: .35rem }
+.look .swatches i { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line) }
+.look .spec { font-size: .85rem; color: var(--muted) }
+.look .demo { display: grid; gap: .4rem; padding: .75rem; background: var(--page); border-radius: 10px }
+
+/* ── features ──────────────────────────────────────────── */
+.feat-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem 2rem }
+.feat-group h3 { padding-bottom: .5rem; border-bottom: 1px solid var(--line); margin-bottom: .2rem }
+.feat { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid var(--line) }
+.feat b { font-weight: 600; display: block; font-size: .95rem }
+.feat small { color: var(--muted); font-size: .84rem; display: block; line-height: 1.4 }
+.feat > div { min-width: 0 }
+
+/* ── marks drawer ──────────────────────────────────────── */
+.marks-btn { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; box-shadow: 0 6px 20px #0002 }
+.drawer { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 20; width: min(380px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 40px #0003; padding: 1rem; display: grid; gap: .6rem; animation: rise .5s var(--ease) }
+@keyframes rise { from { opacity: 0; transform: translateY(8px) } }
+.drawer .mrow { display: grid; gap: .3rem; padding-bottom: .6rem; border-bottom: 1px solid var(--line) }
+.drawer .mrow > div { display: flex; justify-content: space-between; gap: .5rem; align-items: center; font-size: .88rem }
+.drawer textarea { width: 100%; font: .85rem/1.4 var(--font-body); border: 1px solid var(--line); border-radius: 8px; padding: .4rem .55rem; background: var(--page); color: var(--fg); resize: vertical; min-height: 2.2rem }
+.tag { font-size: .72rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px }
+.tag.want { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent) }
+.tag.maybe { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent) }
+.tag.nope { color: var(--bad); background: var(--bad-tint) }
+.sync { font-size: .75rem; color: var(--muted) }
+
+/* ── responsive ────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr }
+  .side { display: none }
+  .under { grid-template-columns: 1fr }
+}
+@media (max-width: 520px) {
+  .qa-help { display: none }
+  .top-tools .seg { display: none }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-hash" viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></symbol>
+  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-cols" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88"/></symbol>
+  <symbol id="i-maybe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5"/></symbol>
+  <symbol id="i-sift" viewBox="0 0 24 24"><path d="M3 5h18M6 12h12M10 19h4"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><svg class="icon lg"><use href="#i-sift"/></svg>Sift <span class="muted" style="font-weight:400;font-size:.85rem">prototype · not real data</span></div>
+    <nav class="nav" id="nav">
+      <a href="#philosophy">Philosophy</a>
+      <a href="#desktop">Desktop</a>
+      <a href="#mobile">Mobile</a>
+      <a href="#styles">Styles</a>
+      <a href="#features">Feature menu</a>
+    </nav>
+    <div class="top-tools">
+      <div class="seg" role="group" aria-label="Style direction">
+        <button data-look-set="calm" class="on">Calm</button><button data-look-set="ledger">Ledger</button>
+      </div>
+      <button class="btn" id="themeBtn" aria-label="Toggle theme"><svg class="icon"><use href="#i-moon"/></svg></button>
+      <label class="switch" title="Show want / maybe / nope pins"><input type="checkbox" id="pinsToggle" checked> <span class="muted" style="font-size:.85rem">Pins</span></label>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ═══════════════ PHILOSOPHY ═══════════════ -->
+<section id="philosophy">
+  <div class="sec-head">
+    <div>
+      <div class="eyebrow">Thesis</div>
+      <h2>Retrieval should drive layout</h2>
+      <p>Todoist nails capture and filtering, then stops. In Sift a view is a saved recipe. Board, list, calendar and widget are just different renderers of the same recipe, and every recipe is editable text.</p>
+    </div>
+  </div>
+  <div class="recipe-flow" aria-label="Recipe pipeline">
+    <span>source</span><i>→</i><span>lanes (each a filter)</span><i>→</i><span>sort</span><i>→</i><span>group</span><i>→</i><span>render: board · list · calendar · widget</span>
+  </div>
+
+  <div class="principles" style="margin-top:1.5rem">
+    <div class="principle"><div class="pinrow"><h3>Capture in under 2 seconds</h3><span data-fb="p-capture"></span></div><p>Widgets, global hotkey, share sheet, email-in. Everything lands in Inbox unless the text says otherwise.</p></div>
+    <div class="principle"><div class="pinrow"><h3>One grammar</h3><span data-fb="p-grammar"></span></div><p>Quick-add shorthand, filter queries and recipes share syntax. <code class="mono">#home @call p1</code> means the same thing everywhere.</p></div>
+    <div class="principle"><div class="pinrow"><h3>Views are data</h3><span data-fb="p-data"></span></div><p>Plain-text recipes you can copy, paste, diff, version and share. No setting lives only in a UI toggle.</p></div>
+    <div class="principle"><div class="pinrow"><h3>Lanes can cascade</h3><span data-fb="p-cascade"></span></div><p>First match wins, so Today, Week, Month and Quarter form horizons instead of duplicates. Overlap is one switch away.</p></div>
+    <div class="principle"><div class="pinrow"><h3>Two dates</h3><span data-fb="p-dates"></span></div><p><b>Scheduled</b> is when I plan to do it. <b>Deadline</b> is when it must be done. Filters can address either or both.</p></div>
+    <div class="principle"><div class="pinrow"><h3>Presets are recipes</h3><span data-fb="p-presets"></span></div><p>Ship opinionated defaults, but each one opens as an editable recipe. Simple by default, deep on demand.</p></div>
+    <div class="principle"><div class="pinrow"><h3>Keys and thumbs</h3><span data-fb="p-parity"></span></div><p>Every action has a keyboard shortcut on desktop and a gesture on mobile.</p></div>
+    <div class="principle"><div class="pinrow"><h3>Local-first</h3><span data-fb="p-local"></span></div><p>Capture works offline, always. Sync is a background concern, never a spinner.</p></div>
+  </div>
+
+  <div class="plan">
+    <div class="sec-head" style="margin:2rem 0 0"><div><div class="eyebrow">Research plan</div><h2 style="font-size:1.3rem">Six tracks; the first five run in parallel</h2></div></div>
+    <div class="plan-row"><b>R1</b><div><h3>Landscape teardown</h3><p>Todoist, TickTick, Things, OmniFocus perspectives, Linear views, Amazing Marvin strategies, Taskwarrior urgency, Obsidian Tasks and Dataview. Output: feature matrix and a list of ideas to borrow.</p></div></div>
+    <div class="plan-row"><b>R2</b><div><h3>Grammar</h3><p>One syntax for capture and filters. Decide on Todoist compatibility. Test against 50 real tasks from your account.</p></div></div>
+    <div class="plan-row"><b>R3</b><div><h3>Platform capabilities</h3><p>iOS interactive widgets (App Intents), Android Glance, Tauri global hotkey, PWA share target. Can a widget take text inline, or must it open a sheet?</p></div></div>
+    <div class="plan-row"><b>R4</b><div><h3>Sync and stack</h3><p>Local-first engines (Zero, PowerSync, ElectricSQL, Automerge, Yjs) against offline capture, conflicts, web plus native, self-hosting.</p></div></div>
+    <div class="plan-row"><b>R5</b><div><h3>Extensibility tiers</h3><p>Recipes, then computed fields, then sandboxed plugins, then API and webhooks. Which tiers ship in v1?</p></div></div>
+    <div class="plan-row"><b>R6</b><div><h3>Validate</h3><p>Use this page: mark what you want, then dogfood a clickable build against your real week. Depends on R1–R5.</p></div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ DESKTOP ═══════════════ -->
+<section id="desktop">
+  <div class="sec-head">
+    <div>
+      <div class="eyebrow">Web &amp; desktop · interactive</div>
+      <h2>Board of filter lanes</h2>
+      <p>Type in the quick-add bar and watch it parse. Click a lane's query to rewrite it. Flip cascade to see overlap. Press <kbd>q</kbd> to jump to capture.</p>
+    </div>
+    <span data-fb="d-overall"></span>
+  </div>
+
+  <div class="device">
+    <div class="chrome"><i></i><i></i><i></i><span class="url">sift.app/home/board</span></div>
+    <div class="app">
+      <aside class="side">
+        <div>
+          <a><svg class="icon"><use href="#i-search"/></svg>Search <span class="n"><kbd>/</kbd></span></a>
+          <a><svg class="icon"><use href="#i-inbox"/></svg>Inbox <span class="n" id="inboxCount">0</span></a>
+        </div>
+        <div>
+          <h4>Views</h4>
+          <a class="on"><svg class="icon"><use href="#i-cols"/></svg>Horizons <span class="n">board</span></a>
+          <a><svg class="icon"><use href="#i-list"/></svg>Today <span class="n">list</span></a>
+          <a><svg class="icon"><use href="#i-flag"/></svg>Deadlines <span class="n">list</span></a>
+          <a><svg class="icon"><use href="#i-cal"/></svg>Week plan <span class="n">cal</span></a>
+        </div>
+        <div>
+          <h4>Projects</h4>
+          <a><i class="dot" style="background:var(--accent)"></i>home</a>
+          <a><i class="dot" style="background:var(--p1)"></i>work</a>
+          <a><i class="dot" style="background:var(--p2)"></i>admin</a>
+          <a><i class="dot" style="background:var(--ok)"></i>health</a>
+        </div>
+        <div><span data-fb="d-sidebar"></span></div>
+      </aside>
+
+      <div class="main">
+        <div class="toolbar">
+          <h3>Horizons</h3>
+          <span class="muted" style="font-size:.85rem">all projects</span>
+          <span class="grow"></span>
+          <div class="seg" role="group" aria-label="Renderer"><button class="on">Board</button><button>List</button><button>Calendar</button></div>
+        </div>
+
+        <div class="qa" id="qa">
+          <div class="qa-line">
+            <svg class="icon" style="color:var(--muted)"><use href="#i-plus"/></svg>
+            <div class="qa-field">
+              <div class="hl" id="qaHl" aria-hidden="true"></div>
+              <input id="qaIn" autocomplete="off" spellcheck="false" placeholder="Add task… try: Renew car insurance #admin @call p1 tomorrow at 9 {fri}" aria-label="Quick add task">
+            </div>
+            <span data-fb="d-quickadd"></span>
+          </div>
+          <div class="chips" id="qaChips"></div>
+          <div class="qa-help">
+            <span><code>#project</code></span><span><code>@label</code></span><span><code>p1–p4</code></span>
+            <span><code>tomorrow · fri · in 3 days · 12 dec</code> scheduled</span>
+            <span><code>at 3pm</code> time</span><span><code>{next fri}</code> deadline</span>
+            <span><kbd>Enter</kbd> add</span>
+          </div>
+        </div>
+
+        <div class="boardbar">
+          <label class="switch"><input type="checkbox" id="cascade" checked> Cascade lanes (first match wins)</label>
+          <span data-fb="d-cascade"></span>
+          <span class="grow" style="flex:1"></span>
+          <span class="muted">Click a query to edit · <span data-fb="d-queries"></span></span>
+        </div>
+
+        <div class="board" id="board"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="under">
+    <div class="panel">
+      <div class="pinrow"><h3>Filter grammar (draft)</h3><span data-fb="d-grammar"></span></div>
+      <table class="grammar">
+        <tr><td>date:today</td><td>Scheduled <i>or</i> deadline on or before today (overdue included)</td></tr>
+        <tr><td>due:7d · deadline:30d</td><td>Rolling window from today. <span class="mono">due</span> = scheduled date only</td></tr>
+        <tr><td>date:week · month · quarter</td><td>Calendar period, until its end</td></tr>
+        <tr><td>overdue · due:none</td><td>Past dates · no scheduled date</td></tr>
+        <tr><td>#home · @call · p1</td><td>Project, label, priority</td></tr>
+        <tr><td>&amp;  |  !  ( )</td><td>And, or, not, grouping. Juxtaposition = and</td></tr>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="pinrow"><h3>This view as a recipe</h3><span data-fb="d-recipe"></span></div>
+      <p class="muted" style="font-size:.88rem">Live. Copy it, paste it into someone else's Sift, or keep it in git.</p>
+      <pre id="recipe"></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ MOBILE ═══════════════ -->
+<section id="mobile">
+  <div class="sec-head">
+    <div>
+      <div class="eyebrow">iOS &amp; Android</div>
+      <h2>Capture first, lanes second</h2>
+      <p>The phone's job is getting things into the Inbox fast, then glancing at horizons. The lane view below runs the same recipe as the desktop board.</p>
+    </div>
+    <span data-fb="m-overall"></span>
+  </div>
+
+  <div class="phones">
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="home">
+          <div class="widget w-4x1"><svg class="icon" style="color:var(--accent-strong)"><use href="#i-plus"/></svg><span class="fake-in">Add to Inbox…</span><span class="mic"><svg class="icon"><use href="#i-mic"/></svg></span></div>
+          <div class="widget w-2x2" id="wToday"><h5><span>Today</span><span id="wTodayN"></span></h5></div>
+          <div class="widget w-1x1"><svg class="icon lg"><use href="#i-plus"/></svg></div>
+          <div class="appicon"></div>
+          <div class="widget w-1x1" style="background:var(--surface);color:var(--accent-strong)"><svg class="icon lg"><use href="#i-mic"/></svg></div>
+          <div class="appicon"></div>
+          <div class="wlbl">Add</div><div class="wlbl"></div><div class="wlbl">Voice</div><div class="wlbl"></div>
+          <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
+        </div>
+      </div>
+      <div class="phone-cap"><h3>Home screen widgets</h3><p>Capture bar (4×1), one-tap add and voice (1×1), a live lane (2×2). Lane widgets take any recipe.</p>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center"><span class="muted" style="font-size:.8rem">bar</span><span data-fb="m-w-bar"></span><span class="muted" style="font-size:.8rem">1×1</span><span data-fb="m-w-1x1"></span><span class="muted" style="font-size:.8rem">lane</span><span data-fb="m-w-lane"></span></div></div>
+    </div>
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="sheet-bg">
+          <div class="sheet">
+            <div class="grab"></div>
+            <div class="eyebrow">Add to Inbox</div>
+            <div class="typed hl" id="mTyped"></div>
+            <div class="chips" id="mChips"></div>
+            <div class="acts">
+              <svg class="icon"><use href="#i-hash"/></svg><svg class="icon"><use href="#i-at"/></svg><svg class="icon"><use href="#i-cal"/></svg><svg class="icon"><use href="#i-flag"/></svg>
+              <span class="send"><svg class="icon"><use href="#i-send"/></svg></span>
+            </div>
+          </div>
+          <div class="kbd"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="m"></i><i class="w"></i><i class="m"></i></div>
+        </div>
+      </div>
+      <div class="phone-cap"><h3>Capture sheet</h3><p>Opens from a widget, share sheet or notification. Same live parsing. Toolbar inserts tokens for thumbs that don't want to type #.</p><span data-fb="m-sheet"></span></div>
+    </div>
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="m-head"><h4>Horizons</h4><svg class="icon lg" style="color:var(--muted)"><use href="#i-filter"/></svg></div>
+        <div class="m-lanes" id="mLanes"></div>
+        <div class="m-list" id="mList"></div>
+        <span class="fab"><svg class="icon lg"><use href="#i-plus"/></svg></span>
+        <div class="tabs">
+          <span><svg class="icon lg"><use href="#i-inbox"/></svg></span>
+          <span class="on"><svg class="icon lg"><use href="#i-cols"/></svg></span>
+          <span><svg class="icon lg"><use href="#i-search"/></svg></span>
+          <span><svg class="icon lg"><use href="#i-list"/></svg></span>
+        </div>
+      </div>
+      <div class="phone-cap"><h3>Lanes on a phone</h3><p>Board columns become a lane switcher with counts. Tap a lane. A swipe could move a task to the next horizon.</p><span data-fb="m-lanes"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ STYLES ═══════════════ -->
+<section id="styles">
+  <div class="sec-head">
+    <div>
+      <div class="eyebrow">Visual direction</div>
+      <h2>Two looks, same bones</h2>
+      <p>Switch them live with Calm / Ledger in the top bar; the whole page re-skins. Light and dark follow your system, with the moon button as override.</p>
+    </div>
+  </div>
+  <div class="looks">
+    <div class="look">
+      <div class="pinrow"><h3>Calm</h3><span data-fb="s-calm"></span></div>
+      <div class="swatches"><i style="background:#fafbfc"></i><i style="background:#ffffff"></i><i style="background:#7ec0d0"></i><i style="background:#376675"></i><i style="background:#002b36"></i><i style="background:#e07c5a"></i></div>
+      <p class="spec">Soft cards, rounded checks, Montserrat headings, Nunito body. Solarized-blue dark mode. Generous rows. For a daily review with coffee.</p>
+      <div class="demo" data-look="calm" id="demoCalm"></div>
+    </div>
+    <div class="look">
+      <div class="pinrow"><h3>Ledger</h3><span data-fb="s-ledger"></span></div>
+      <div class="swatches"><i style="background:#fafbfc"></i><i style="background:#f1f4f6"></i><i style="background:#376675"></i><i style="background:#1a1a2e"></i><i style="background:#d0603e"></i></div>
+      <p class="spec">Square edges, one-line rows, monospace metadata, no shadows. About 40% more tasks per screen. For keyboard-heavy triage.</p>
+      <div class="demo" data-look="ledger" id="demoLedger"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FEATURES ═══════════════ -->
+<section id="features">
+  <div class="sec-head">
+    <div>
+      <div class="eyebrow">Brainstorm</div>
+      <h2>Feature menu</h2>
+      <p>Mark each one want, maybe or nope. Add notes in the marks panel at the bottom right. I read these back and we take it from there.</p>
+    </div>
+  </div>
+  <div class="feat-groups" id="feats"></div>
+</section>
+
+</main>
+
+<button class="btn primary marks-btn" id="marksBtn"><svg class="icon"><use href="#i-msg"/></svg>Your marks <span id="marksN">0</span></button>
+<div class="drawer" id="drawer" hidden></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   Dates
+   ════════════════════════════════════════════════════════════ */
+
+const DAY   = 864e5
+const T     = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })()
+const addD  = n => new Date(T.getTime() + n * DAY)
+const WD    = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+const MON   = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+
+// Calendar period ends (ISO week: Mon–Sun)
+const END = {
+  today:   T,
+  week:    addD(6 - (T.getDay() + 6) % 7),
+  month:   new Date(T.getFullYear(), T.getMonth() + 1, 0),
+  quarter: new Date(T.getFullYear(), Math.floor(T.getMonth() / 3) * 3 + 3, 0),
+}
+
+const fmt = d => {
+  const diff = Math.round((d - T) / DAY)
+  if (diff === 0)  return "Today"
+  if (diff === 1)  return "Tomorrow"
+  if (diff === -1) return "Yesterday"
+  if (diff > 1 && diff < 7) return d.toLocaleDateString("en", { weekday: "short" })
+  return d.toLocaleDateString("en", { day: "numeric", month: "short" })
+}
+
+// Natural-ish date phrase → Date (or null)
+function parseDate(s) {
+  s = s.trim().toLowerCase().replace(/^(on|by|due)\s+/, "")
+  if (/^(today|tod)$/.test(s))        return T
+  if (/^(tomorrow|tmr|tom)$/.test(s)) return addD(1)
+
+  let m
+  if ((m = s.match(/^in (\d+) (day|days|d|week|weeks|w|month|months)$/))) {
+    const n = +m[1], u = m[2][0]
+    return u === "d" ? addD(n) : u === "w" ? addD(n * 7) : new Date(T.getFullYear(), T.getMonth() + n, T.getDate())
+  }
+  if (s === "next week")  return addD(7 - (T.getDay() + 6) % 7)
+  if (s === "next month") return new Date(T.getFullYear(), T.getMonth() + 1, 1)
+
+  if ((m = s.match(/^(next )?(mon|tue|wed|thu|fri|sat|sun)[a-z]*$/))) {
+    let diff = (WD.indexOf(m[2]) - T.getDay() + 7) % 7 || 7
+    if (m[1]) diff += diff < 7 ? 7 : 0
+    return addD(diff)
+  }
+  if ((m = s.match(/^(\d{1,2}) (jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*$/))) {
+    const d = new Date(T.getFullYear(), MON.indexOf(m[2]), +m[1])
+    if (d < T) d.setFullYear(d.getFullYear() + 1)
+    return d
+  }
+  return null
+}
+
+/* ════════════════════════════════════════════════════════════
+   Quick-add parser — returns task fields + highlight spans
+   ════════════════════════════════════════════════════════════ */
+
+const DATE_RX = String.raw`(?:on |by )?(?:today|tod|tomorrow|tmr|in \d+ (?:days?|d|weeks?|w|months?)|next (?:week|month)|(?:next )?(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d{1,2} (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)`
+
+const RULES = [
+  { kind: "deadline", rx: /\{([^}]+)\}/gi,                          apply: (t, m) => (t.deadline = parseDate(m[1])) },
+  { kind: "proj",     rx: /(?<=^|\s)#([\w-]+)/gi,                    apply: (t, m) => (t.project = m[1].toLowerCase()) },
+  { kind: "label",    rx: /(?<=^|\s)@([\w-]+)/gi,                    apply: (t, m) => t.labels.push(m[1].toLowerCase()) },
+  { kind: "prio",     rx: /(?<=^|\s)p([1-4])\b/gi,                   apply: (t, m) => (t.p = +m[1]) },
+  { kind: "time",     rx: /\bat (\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/gi, apply: (t, m) => {
+      let h = +m[1]; if (m[3]?.toLowerCase() === "pm" && h < 12) h += 12
+      t.time = `${String(h).padStart(2, "0")}:${m[2] || "00"}`
+    } },
+  { kind: "due",      rx: new RegExp(String.raw`(?<=^|\s)${DATE_RX}(?=$|\s)`, "gi"), apply: (t, m) => (t.due = parseDate(m[0])) },
+]
+
+function parseCapture(text) {
+  const task  = { title: "", project: null, labels: [], p: 4, due: null, time: null, deadline: null }
+  const spans = []
+  const taken = i => spans.some(s => i >= s.from && i < s.to)
+
+  for (const rule of RULES) {
+    for (const m of text.matchAll(rule.rx)) {
+      if (taken(m.index)) continue
+      rule.apply(task, m)
+      spans.push({ from: m.index, to: m.index + m[0].length, kind: rule.kind })
+    }
+  }
+
+  // Time without a date implies today
+  if (task.time && !task.due) task.due = T
+
+  spans.sort((a, b) => a.from - b.from)
+  let title = "", i = 0
+  for (const s of spans) { title += text.slice(i, s.from); i = s.to }
+  task.title = (title + text.slice(i)).replace(/\s+/g, " ").trim()
+
+  return { task, spans }
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
+
+const highlight = (text, spans) => {
+  let out = "", i = 0
+  for (const s of spans) {
+    out += esc(text.slice(i, s.from)) + `<mark class="k-${s.kind}">${esc(text.slice(s.from, s.to))}</mark>`
+    i = s.to
+  }
+  return out + esc(text.slice(i))
+}
+
+/* ════════════════════════════════════════════════════════════
+   Filter language — tiny recursive-descent → predicate
+   ════════════════════════════════════════════════════════════ */
+
+function compileFilter(src) {
+  const toks = src.match(/\(|\)|&|\||!|[^\s()&|!]+/g) || []
+  let i = 0
+  const peek = () => toks[i], next = () => toks[i++]
+
+  const orE = () => { let l = andE(); while (peek() === "|") { next(); const r = andE(), a = l; l = t => a(t) || r(t) } return l }
+  const andE = () => {
+    let l = notE()
+    while (peek() && peek() !== ")" && peek() !== "|") {
+      if (peek() === "&") next()
+      const r = notE(), a = l; l = t => a(t) && r(t)
+    }
+    return l
+  }
+  const notE = () => { if (peek() === "!") { next(); const e = notE(); return t => !e(t) } return atom() }
+  const atom = () => {
+    const tok = next()
+    if (tok === undefined) throw Error("Query ends early")
+    if (tok === "(") { const e = orE(); if (next() !== ")") throw Error("Missing )"); return e }
+    return term(tok.toLowerCase())
+  }
+
+  const horizon = v => {
+    if (END[v]) return END[v]
+    const m = v.match(/^(\d+)d$/)
+    if (m) return addD(+m[1] - 1)
+    throw Error(`Unknown period "${v}"; try today, 7d, week, month, quarter`)
+  }
+
+  function term(tok) {
+    if (tok === "overdue") return t => (t.due && t.due < T) || (t.deadline && t.deadline < T)
+    if (tok === "done")    return t => t.done
+    if (/^p[1-4]$/.test(tok)) return t => t.p === +tok[1]
+    if (tok[0] === "#")    return t => t.project === tok.slice(1)
+    if (tok[0] === "@")    return t => t.labels.includes(tok.slice(1))
+
+    const m = tok.match(/^(due|deadline|date):(.+)$/)
+    if (!m) throw Error(`Unknown term "${tok}"`)
+    const [, field, v] = m
+    if (v === "none") return field === "deadline" ? t => !t.deadline : field === "due" ? t => !t.due : t => !t.due && !t.deadline
+    const end = horizon(v)
+    const inD = d => d && d <= end
+    return field === "due" ? t => inD(t.due) : field === "deadline" ? t => inD(t.deadline) : t => inD(t.due) || inD(t.deadline)
+  }
+
+  const fn = orE()
+  if (i < toks.length) throw Error(`Unexpected "${toks[i]}"`)
+  return fn
+}
+
+/* ════════════════════════════════════════════════════════════
+   Sample data (relative to today) + view state
+   ════════════════════════════════════════════════════════════ */
+
+let uid = 0
+const mk = (title, project, p, { due, time, dl, labels = [] } = {}) => ({
+  id: ++uid, title, project, p, labels, time: time || null,
+  due: due == null ? null : addD(due), deadline: dl == null ? null : addD(dl), done: false,
+})
+
+const tasks = [
+  mk("Review onboarding PR",            "work",   2, { due: -1, labels: ["deep"] }),
+  mk("Draft Q1 roadmap",                "work",   1, { due: 0, time: "10:00", dl: 9, labels: ["deep"] }),
+  mk("Call plumber about the boiler",   "home",   2, { due: 0, labels: ["call"] }),
+  mk("Renew passport",                  "admin",  1, { due: 1, dl: 5, labels: ["errand"] }),
+  mk("Cancel unused subscriptions",     "admin",  3, { due: 2 }),
+  mk("Book dentist check-up",           "health", 3, { due: 3, labels: ["call"] }),
+  mk("Prepare workshop slides",         "work",   1, { due: 4, time: "14:00", dl: 4 }),
+  mk("Write newsletter draft",          "work",   2, { due: 6, labels: ["deep"] }),
+  mk("Order birthday gift for Sam",     "home",   2, { dl: 8, labels: ["errand"] }),
+  mk("Plan winter trip",                "home",   4, { due: 12 }),
+  mk("Pay quarterly VAT",               "admin",  1, { dl: 20 }),
+  mk("Replace bike chain",              "home",   4, { due: 25, labels: ["errand"] }),
+  mk("Annual review self-assessment",   "work",   2, { dl: 34 }),
+  mk("Physio exercises routine",        "health", 3, { due: 0, labels: ["habit"] }),
+  mk("Send tax documents to accountant","admin",  1, { dl: 60 }),
+  mk("Clean up photo library",          "home",   4, {}),
+]
+
+const view = {
+  name: "Horizons",
+  cascade: true,
+  lanes: [
+    { name: "Today",        query: "date:today",   sort: "priority" },
+    { name: "This week",    query: "date:7d",      sort: "date" },
+    { name: "This month",   query: "date:30d",   sort: "priority" },
+    { name: "This quarter", query: "date:90d", sort: "deadline" },
+  ],
+}
+
+const SORTS = {
+  priority: (a, b) => a.p - b.p || firstDate(a) - firstDate(b),
+  date:     (a, b) => firstDate(a) - firstDate(b) || a.p - b.p,
+  deadline: (a, b) => (a.deadline ?? Infinity) - (b.deadline ?? Infinity) || a.p - b.p,
+}
+const firstDate = t => Math.min(t.due ?? Infinity, t.deadline ?? Infinity)
+
+// Distribute open tasks into lanes; cascade = first matching lane only
+function distribute() {
+  const seen = new Set()
+  return view.lanes.map(lane => {
+    let fn, error = null
+    try { fn = compileFilter(lane.query) } catch (e) { error = e.message; fn = () => false }
+    const items = tasks
+      .filter(t => !t.done && !(view.cascade && seen.has(t.id)) && fn(t))
+      .sort(SORTS[lane.sort])
+    if (view.cascade) items.forEach(t => seen.add(t.id))
+    return { lane, items, error }
+  })
+}
+
+/* ════════════════════════════════════════════════════════════
+   Rendering
+   ════════════════════════════════════════════════════════════ */
+
+const ico = id => `<svg class="icon"><use href="#i-${id}"/></svg>`
+
+function metaChips(t) {
+  const c = []
+  if (t.due) {
+    const late = t.due < T
+    c.push(`<span class="chip due${late ? " overdue" : ""}">${ico("cal")}${fmt(t.due)}${t.time ? " " + t.time : ""}</span>`)
+  }
+  if (t.deadline) c.push(`<span class="chip deadline${t.deadline < T ? " overdue" : ""}">${ico("flag")}${fmt(t.deadline)}</span>`)
+  if (t.project)  c.push(`<span class="chip proj">#${esc(t.project)}</span>`)
+  t.labels.forEach(l => c.push(`<span class="chip label">@${esc(l)}</span>`))
+  return c.join("")
+}
+
+const card = t => `
+  <div class="card" data-id="${t.id}">
+    <button class="check p${t.p}" aria-label="Complete ${esc(t.title)}"></button>
+    <div class="t">${esc(t.title)}</div>
+    <div class="meta">${metaChips(t)}</div>
+  </div>`
+
+function renderBoard() {
+  const cols = distribute()
+
+  document.getElementById("board").innerHTML = cols.map(({ lane, items, error }, i) => `
+    <div class="col">
+      <div class="col-head">
+        <h3>${esc(lane.name)}</h3><span class="n">${items.length}</span>
+        <select data-sort="${i}" aria-label="Sort ${esc(lane.name)}">
+          ${Object.keys(SORTS).map(k => `<option value="${k}"${k === lane.sort ? " selected" : ""}>by ${k}</option>`).join("")}
+        </select>
+      </div>
+      <label class="q${error ? " err" : ""}">${ico("filter")}<input data-q="${i}" value="${esc(lane.query)}" aria-label="Filter for ${esc(lane.name)}"></label>
+      ${error ? `<div class="q-err">${esc(error)}</div>` : ""}
+      ${items.map(card).join("") || `<div class="empty">Nothing matches</div>`}
+    </div>`).join("") + `<button class="addcol" id="addCol">${ico("plus")}&nbsp;Add lane</button>`
+
+  document.getElementById("inboxCount").textContent = tasks.filter(t => !t.done && !t.due && !t.deadline).length
+  renderRecipe()
+  renderMobileLanes(cols)
+  renderWidget(cols[0])
+  renderDemos(cols[0])
+}
+
+function renderRecipe() {
+  const lines = [
+    `view "${view.name}" {`,
+    `  source:  all projects & !done`,
+    `  render:  board`,
+    `  cascade: ${view.cascade}`,
+    ...view.lanes.map(l => `  lane "${l.name}"`.padEnd(22) + `{ filter: ${l.query}  sort: ${l.sort} }`),
+    `}`,
+  ]
+  document.getElementById("recipe").textContent = lines.join("\n")
+}
+
+// Board interactions (delegated)
+const board = document.getElementById("board")
+board.addEventListener("change", e => {
+  const s = e.target.dataset.sort
+  if (s != null) { view.lanes[s].sort = e.target.value; renderBoard() }
+})
+board.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.q != null) e.target.blur() })
+board.addEventListener("focusout", e => {
+  const q = e.target.dataset.q
+  if (q != null && view.lanes[q].query !== e.target.value) { view.lanes[q].query = e.target.value; renderBoard() }
+})
+board.addEventListener("click", e => {
+  if (e.target.closest("#addCol")) {
+    view.lanes.push({ name: "High priority", query: "p1 | p2 & date:7d", sort: "priority" })
+    renderBoard()
+    return
+  }
+  const chk = e.target.closest(".check")
+  if (!chk) return
+  const el = chk.closest(".card"), t = tasks.find(x => x.id === +el.dataset.id)
+  t.done = true
+  el.classList.add("done")
+  setTimeout(renderBoard, 320)
+})
+document.getElementById("cascade").addEventListener("change", e => { view.cascade = e.target.checked; renderBoard() })
+
+/* ── quick add ───────────────────────────────────────────── */
+
+const qaIn = document.getElementById("qaIn"), qaHl = document.getElementById("qaHl"), qaChips = document.getElementById("qaChips")
+
+function captureChips(task) {
+  const c = []
+  c.push(`<span class="chip proj">${ico("inbox")}${task.project ? "#" + esc(task.project) : "Inbox"}</span>`)
+  if (task.p < 4) c.push(`<span class="chip" style="color:var(--p${task.p})">${ico("flag")}P${task.p}</span>`)
+  if (task.due) c.push(`<span class="chip due">${ico("cal")}${fmt(task.due)}${task.time ? " " + task.time : ""}</span>`)
+  if (task.deadline) c.push(`<span class="chip deadline">${ico("flag")}deadline ${fmt(task.deadline)}</span>`)
+  task.labels.forEach(l => c.push(`<span class="chip label">@${esc(l)}</span>`))
+  return c.join("")
+}
+
+function syncQA() {
+  const { task, spans } = parseCapture(qaIn.value)
+  qaHl.innerHTML = highlight(qaIn.value, spans)
+  qaChips.innerHTML = qaIn.value.trim() ? captureChips(task) : ""
+  qaHl.scrollLeft = qaIn.scrollLeft
+}
+qaIn.addEventListener("input", syncQA)
+qaIn.addEventListener("scroll", () => (qaHl.scrollLeft = qaIn.scrollLeft))
+qaIn.addEventListener("keydown", e => {
+  if (e.key === "Escape") return qaIn.blur()
+  if (e.key !== "Enter") return
+  const { task } = parseCapture(qaIn.value)
+  if (!task.title) return
+  tasks.push({ ...task, id: ++uid, done: false })
+  qaIn.value = ""
+  syncQA()
+  renderBoard()
+})
+document.addEventListener("keydown", e => {
+  if (e.key === "q" && !e.target.closest("input, textarea, select")) {
+    e.preventDefault()
+    document.getElementById("desktop").scrollIntoView({ behavior: "smooth", block: "start" })
+    qaIn.focus({ preventScroll: true })
+  }
+})
+
+/* ── mobile ─────────────────────────────────────────────── */
+
+let mLane = 0
+function renderMobileLanes(cols) {
+  document.getElementById("mLanes").innerHTML = cols.map((c, i) =>
+    `<button data-ml="${i}" class="${i === mLane ? "on" : ""}">${esc(c.lane.name)}<b>${c.items.length}</b></button>`).join("")
+  const cur = cols[mLane] || cols[0]
+  document.getElementById("mList").innerHTML = cur.items.map(card).join("") || `<div class="empty">Nothing matches</div>`
+}
+document.getElementById("mLanes").addEventListener("click", e => {
+  const b = e.target.closest("[data-ml]")
+  if (b) { mLane = +b.dataset.ml; renderBoard() }
+})
+
+function renderWidget(col) {
+  const w = document.getElementById("wToday")
+  w.innerHTML = `<h5><span>${esc(col.lane.name)}</span><span>${col.items.length}</span></h5>` +
+    col.items.slice(0, 5).map(t => `<div class="wrow"><span class="check p${t.p}"></span><span>${esc(t.title)}</span></div>`).join("")
+}
+
+// Animated typing demo in the capture sheet
+const DEMO_TEXT = "Pick up dry cleaning @errand tomorrow at 5pm p2"
+const mTyped = document.getElementById("mTyped"), mChips = document.getElementById("mChips")
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
+function typeStep(n) {
+  const s = DEMO_TEXT.slice(0, n), { task, spans } = parseCapture(s)
+  mTyped.innerHTML = highlight(s, spans) + (n < DEMO_TEXT.length ? '<span style="color:var(--accent-strong)">|</span>' : "")
+  mChips.innerHTML = captureChips(task)
+  if (reduced) return
+  setTimeout(() => typeStep(n >= DEMO_TEXT.length ? 0 : n + 1), n >= DEMO_TEXT.length ? 2600 : 70)
+}
+typeStep(reduced ? DEMO_TEXT.length : 0)
+
+/* ── style demos ────────────────────────────────────────── */
+
+function renderDemos(col) {
+  const html = col.items.slice(0, 3).map(card).join("")
+  document.getElementById("demoCalm").innerHTML = html
+  document.getElementById("demoLedger").innerHTML = html
+}
+
+document.querySelectorAll("[data-look-set]").forEach(b => b.addEventListener("click", () => {
+  document.documentElement.dataset.look = b.dataset.lookSet
+  document.querySelectorAll("[data-look-set]").forEach(x => x.classList.toggle("on", x === b))
+}))
+
+document.getElementById("themeBtn").addEventListener("click", () => {
+  const root = document.documentElement
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches
+  root.dataset.theme = dark ? "light" : "dark"
+})
+
+/* ════════════════════════════════════════════════════════════
+   Feature menu
+   ════════════════════════════════════════════════════════════ */
+
+const FEATURES = {
+  "Capture": [
+    ["f-shorthand",  "Todoist-style shorthand",        "#project @label p1 dates, highlighted as you type"],
+    ["f-deadline",   "Separate deadline token",        "{fri} sets a deadline, plain dates set scheduled"],
+    ["f-voice",      "Voice capture",                  "Dictate on widget or watch, parsed the same way"],
+    ["f-share",      "Share sheet and email-in",       "Send a link, mail or selection straight to Inbox"],
+    ["f-hotkey",     "Global desktop hotkey",          "Capture window over any app"],
+    ["f-templates",  "Capture templates",              "Snippets like ;groceries expand into a task with a checklist"],
+  ],
+  "Organize": [
+    ["f-fields",     "Custom fields",                  "Energy, estimate, context; typed and filterable"],
+    ["f-recur",      "Smart recurrence",               "every 2nd tue, every 3 days after done"],
+    ["f-subtasks",   "Subtasks and checklists",        "Nested tasks versus a lightweight checklist"],
+    ["f-deps",       "Dependencies",                   "Blocked tasks hide until the blocker is done"],
+    ["f-urgency",    "Computed urgency score",         "Taskwarrior-like formula you can tune"],
+  ],
+  "Views": [
+    ["f-lanes",      "Filter-lane boards",             "Columns defined by queries, as in this prototype"],
+    ["f-drag",       "Drag between lanes rewrites dates", "Drop into This week and the task gets a date inside it"],
+    ["f-calendar",   "Calendar renderer",              "Same recipe drawn as a week grid with time blocks"],
+    ["f-group",      "Group within lanes",             "Swimlanes by project or priority"],
+    ["f-review",     "Weekly review mode",             "Step through stale and undated tasks one at a time"],
+    ["f-gcal",       "Calendar overlay",               "Show meetings beside tasks to plan the day"],
+  ],
+  "Extensibility": [
+    ["f-recipes",    "Recipes as text",                "Copy, paste and share whole views"],
+    ["f-formulas",   "Formula fields",                 "Computed values, spreadsheet-style"],
+    ["f-plugins",    "Sandboxed plugins",              "JS or WASM: new renderers, parsers, automations"],
+    ["f-api",        "API, webhooks, CLI",             "Script it, automate it, pipe from the terminal"],
+    ["f-themes",     "Theme and density tokens",       "Beyond light and dark: user-made skins"],
+    ["f-ai",         "AI triage helper",               "Suggest dates and lanes for Inbox items, opt-in"],
+  ],
+  "Platforms": [
+    ["f-widgets",    "Home and lock screen widgets",   "Capture bar, one-tap add, live lane"],
+    ["f-offline",    "Offline-first sync",             "Never block capture on network"],
+    ["f-import",     "Todoist import",                 "Bring projects, labels, filters on day one"],
+    ["f-watch",      "Watch app",                      "Capture and tick off from the wrist"],
+    ["f-selfhost",   "Self-hostable sync server",      "Own your data"],
+  ],
+}
+
+document.getElementById("feats").innerHTML = Object.entries(FEATURES).map(([group, list]) => `
+  <div class="feat-group">
+    <h3>${group}</h3>
+    ${list.map(([key, name, desc]) => `
+      <div class="feat"><div><b>${esc(name)}</b><small>${esc(desc)}</small></div><span data-fb="${key}" data-fb-label="${esc(name)}"></span></div>`).join("")}
+  </div>`).join("")
+
+/* ════════════════════════════════════════════════════════════
+   Feedback pins — stored in shared db (Claude reads them back),
+   local-storage fallback when db is unavailable
+   ════════════════════════════════════════════════════════════ */
+
+const marks = {}                    // key → { v, note, label }
+const LS = "sift-marks"
+let db = null
+
+const labelFor = key => {
+  const el = document.querySelector(`[data-fb="${key}"]`)
+  if (el?.dataset.fbLabel) return el.dataset.fbLabel
+  const host = el?.closest(".principle, .look, .phone-wrap, .panel, .sec-head, .feat, .qa, .boardbar, .side")
+  return host?.querySelector("h2, h3, b")?.textContent?.trim() || key
+}
+
+const pinHTML = key => `
+  <span class="fb" role="group" aria-label="Your verdict">
+    <button data-v="want"  aria-pressed="false" title="Want">${ico("up")}want</button>
+    <button data-v="maybe" aria-pressed="false" title="Maybe">${ico("maybe")}</button>
+    <button data-v="nope"  aria-pressed="false" title="Nope">${ico("down")}</button>
+  </span>`
+
+document.querySelectorAll("[data-fb]").forEach(el => (el.innerHTML = pinHTML(el.dataset.fb)))
+
+function paintPins() {
+  document.querySelectorAll("[data-fb]").forEach(el => {
+    const v = marks[el.dataset.fb]?.v
+    el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)))
+  })
+  document.getElementById("marksN").textContent = Object.values(marks).filter(m => m.v).length
+  if (!drawer.hidden) renderDrawer()
+}
+
+async function saveMark(key) {
+  const m = marks[key]
+  try { localStorage.setItem(LS, JSON.stringify(marks)) } catch {}
+  if (!db) return
+  try {
+    const ref = db.collection("feedback").doc(key)
+    m?.v ? await ref.set({ v: m.v, note: m.note || "", label: m.label, at: Date.now() }) : await ref.delete()
+  } catch (e) { setSync(`Not saved to shared store (${e.code || "error"}); kept in this browser`) }
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest(".fb button")
+  if (!b) return
+  const key = b.closest("[data-fb]").dataset.fb
+  const cur = marks[key] || { note: "", label: labelFor(key) }
+  cur.v = cur.v === b.dataset.v ? null : b.dataset.v
+  marks[key] = cur
+  paintPins()
+  saveMark(key)
+})
+
+/* ── marks drawer ───────────────────────────────────────── */
+
+const drawer = document.getElementById("drawer")
+let syncMsg = "Saving to this browser only"
+const setSync = msg => { syncMsg = msg; const el = drawer.querySelector(".sync"); if (el) el.textContent = msg }
+
+function renderDrawer() {
+  const rows = Object.entries(marks).filter(([, m]) => m.v)
+  drawer.innerHTML = `
+    <div class="pinrow"><h3>Your marks</h3><span class="sync">${esc(syncMsg)}</span></div>
+    ${rows.length ? rows.map(([k, m]) => `
+      <div class="mrow">
+        <div><span>${esc(m.label)}</span><span class="tag ${m.v}">${m.v}</span></div>
+        <textarea id="note-${esc(k)}" data-note="${esc(k)}" placeholder="Why? (optional)">${esc(m.note || "")}</textarea>
+      </div>`).join("") : `<p class="muted" style="font-size:.9rem">Nothing marked yet. Use the want · ? · nope pins next to anything on the page.</p>`}`
+}
+
+let noteTimer
+drawer.addEventListener("input", e => {
+  const k = e.target.dataset.note
+  if (!k) return
+  marks[k].note = e.target.value
+  clearTimeout(noteTimer)
+  noteTimer = setTimeout(() => saveMark(k), 600)
+})
+document.getElementById("marksBtn").addEventListener("click", () => {
+  drawer.hidden = !drawer.hidden
+  if (!drawer.hidden) renderDrawer()
+})
+document.getElementById("pinsToggle").addEventListener("change", e => document.body.classList.toggle("no-pins", !e.target.checked))
+
+// Boot: local marks first, then shared store when available
+try { Object.assign(marks, JSON.parse(localStorage.getItem(LS) || "{}")) } catch {}
+paintPins()
+
+;(async () => {
+  db = await window.claude?.use?.("db").catch(() => null)
+  if (!db) return
+  setSync("Saved · Claude can read these")
+  const timer = setTimeout(() => setSync("Shared store is slow; marks kept locally"), 10000)
+  db.collection("feedback").onSnapshot(snap => {
+    clearTimeout(timer)
+    snap.docChanges().forEach(({ type, doc }) => {
+      const x = doc.data()
+      if (type === "removed") delete marks[doc.id]
+      else if (x) marks[doc.id] = { v: x.v, note: x.note, label: x.label }
+    })
+    paintPins()
+  }, () => { clearTimeout(timer); setSync("Shared store unavailable; marks kept locally"); db = null })
+})()
+
+/* ── nav highlight ──────────────────────────────────────── */
+
+const navLinks = [...document.querySelectorAll("#nav a")]
+navLinks.forEach(a => a.addEventListener("click", e => {
+  e.preventDefault()
+  document.querySelector(a.getAttribute("href")).scrollIntoView({ behavior: reduced ? "auto" : "smooth" })
+}))
+const io = new IntersectionObserver(entries => entries.forEach(en => {
+  if (en.isIntersecting) navLinks.forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id))
+}), { rootMargin: "-40% 0px -55% 0px" })
+document.querySelectorAll("main section").forEach(s => io.observe(s))
+
+renderBoard()
+syncQA()
+</script>
