@@ -1,6 +1,6 @@
-# Sift — research plan
+# Dolist — research plan
 
-Working name: **Sift** (tasks get sifted into lanes by rules you write).
+Working title: **Dolist**.
 Status: pre-design. No implementation yet. Prototype: `design/prototype.html`.
 
 ---
@@ -8,7 +8,7 @@ Status: pre-design. No implementation yet. Prototype: `design/prototype.html`.
 ## Thesis
 
 Todoist nails *capture* (shorthand) and *retrieval* (filters). It stops short of letting retrieval drive *layout*.
-Sift's core move: **a view is a saved recipe** = `source → lanes (each a filter) → sort → group → render`.
+Dolist's core move: **a view is a saved recipe** = `source → lanes (each a filter) → sort → group → render`.
 Board, list, calendar, widget are just renderers of the same recipe. Everything user-facing is data you can edit, copy, share.
 
 ## Principles (draft, to argue about)
@@ -72,3 +72,26 @@ Phases R1–R5 parallelizable (independent agents). R6 depends on all.
 - Drag between lanes: rewrite dates or forbid?
 - Plugin tier in v1 or later?
 - Self-hosted sync required?
+
+---
+
+## Round 2 decisions (2026-11-23)
+
+**Philosophy additions**
+- Calm: show results, hide machinery. Syntax/queries never on the main surface; cheatsheet behind a "?" marker.
+- "Common easy, uncommon possible" = 6 rungs: type+Enter → words → presets+drag → lane builder → text → code. Each rung behind one quiet door.
+- Thumbs first: grammar optimised for mobile tap cost. Words > cheap prefixes (`@ ! :`) > accessory key (`#`). No braces.
+
+**Grammar v1 (proposed)**
+| Token | Meaning |
+|---|---|
+| `fri`, `tomorrow`, `in 3 days` | scheduled |
+| `by fri`, `before 12 dec` | deadline (replaces `{fri}`) |
+| `at 3pm` | time |
+| `!1`–`!4` (`p1` alias) | priority |
+| `#home` / `@call` | project / label |
+| `energy:low` | custom field |
+| `"…"` | literal, stops parsing |
+
+**Dropped (round 1 marks):** calendar view + overlay, weekly review, AI triage, voice, watch, capture-bar widget, templates, formula fields, self-hosted sync.
+**Open (round 2 page):** deadline/priority/project syntax, drag rule, deadline-pins-task rule, custom field entry, deps UI, density, rolling vs calendar lanes.

@@ -1,4 +1,4 @@
 # For the human
 
-- Read the `feedback` marks before next brainstorm; open decisions listed at bottom of docs/RESEARCH_PLAN.md.
-- Rolling (7d/30d/90d) vs calendar (this week/month/quarter) lanes: picked rolling as default; confirm.
+- Round 2 options awaiting marks on the prototype (collection `feedback2`).
+- Rolling vs calendar default lanes: rolling recommended, unconfirmed.

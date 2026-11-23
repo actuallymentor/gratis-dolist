@@ -1,40 +1,36 @@
-<title>Sift Prototype</title>
+<title>Dolist Prototype</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Nunito:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: sticky section nav → long scroll of review sections; each reviewable thing carries a want/maybe/nope pin */
+/* Layout: sticky nav → review sections (round 2). Calm surfaces; machinery sits behind one quiet control. */
 :root {
-  --page: #fafbfc; --surface: #ffffff; --sunk: #f1f4f6; --line: #e3e8ec;
-  --fg: #1a1a2e; --muted: #6b7280;
-  --accent: #7ec0d0; --accent-strong: #376675; --accent-tint: #7ec0d026;
+  --page: #fafbfc; --surface: #ffffff; --sunk: #f2f5f7; --line: #e5e9ed; --line-soft: #eef1f4;
+  --fg: #1a1a2e; --muted: #6b7280; --faint: #9aa3ad;
+  --accent: #7ec0d0; --accent-strong: #376675; --accent-tint: #7ec0d024;
   --p1: #d0603e; --p2: #b8860b; --p3: #376675; --p4: #9aa3ad;
-  --ok: #2f8a5b; --warn: #b8860b; --bad: #c2453a; --bad-tint: #c2453a14;
+  --ok: #2f8a5b; --warn: #b8860b; --bad: #c2453a; --bad-tint: #c2453a12;
   --font-head: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-meta: "Nunito", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
-  --radius: 10px; --radius-sm: 6px; --row-pad: .6rem .75rem; --card-shadow: 0 1px 2px #1a1a2e0f;
+  --radius: 10px; --radius-sm: 7px; --row-pad: .6rem .75rem; --row-gap: .45rem; --card-shadow: 0 1px 2px #1a1a2e0d;
   --ease: cubic-bezier(.2,.8,.2,1);
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652;
-  --fg: #e6ecf0; --muted: #aab6c1; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
+  --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652; --line-soft: #0d3f4b;
+  --fg: #e6ecf0; --muted: #aab6c1; --faint: #6f8792; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
   --p1: #e98a6a; --p2: #f0c040; --p3: #7ec0d0; --p4: #6f8792;
   --ok: #5cc28a; --warn: #f0c040; --bad: #ef7d70; --bad-tint: #ef7d7018; --card-shadow: none;
   color-scheme: dark } }
 :root[data-theme="dark"] {
-  --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652;
-  --fg: #e6ecf0; --muted: #aab6c1; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
+  --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652; --line-soft: #0d3f4b;
+  --fg: #e6ecf0; --muted: #aab6c1; --faint: #6f8792; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
   --p1: #e98a6a; --p2: #f0c040; --p3: #7ec0d0; --p4: #6f8792;
   --ok: #5cc28a; --warn: #f0c040; --bad: #ef7d70; --bad-tint: #ef7d7018; --card-shadow: none;
   color-scheme: dark }
 
-/* Style direction B: "Ledger" — dense, square, mono metadata, keyboard-first */
-[data-look="ledger"] {
-  --radius: 3px; --radius-sm: 2px; --row-pad: .35rem .55rem; --card-shadow: none;
-  --font-meta: var(--font-mono);
-}
+/* Density is a setting, not a second theme */
+[data-density="compact"] { --row-pad: .32rem .55rem; --row-gap: .25rem; --radius-sm: 4px }
 
 * { box-sizing: border-box }
 [hidden] { display: none !important }
@@ -42,195 +38,223 @@ html { font-size: 100% }
 body {
   background: var(--page); color: var(--fg); font: 400 1rem/1.5 var(--font-body);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 0 4rem;
+  padding-block: 0 5rem;
 }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--page) }
 h1, h2, h3 { font-family: var(--font-head); font-weight: 500; text-wrap: balance; margin: 0 }
 h2 { font-size: 1.625rem }
-h3 { font-size: 1.05rem; font-weight: 600 }
+h3 { font-size: 1.02rem; font-weight: 600 }
 p { margin: 0 }
-a { color: var(--accent-strong) }
 button { font: inherit; color: inherit }
+code, .mono { font-family: var(--font-mono); font-size: .86em }
 :focus-visible { outline: none; box-shadow: 0 0 0 5px var(--accent-tint), 0 0 0 1px var(--accent) }
-.wrap { max-width: 1240px; margin: 0 auto }
+.wrap { max-width: 1200px; margin: 0 auto }
 .muted { color: var(--muted) }
-.mono { font-family: var(--font-mono); font-size: .85em }
 .icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none }
 .icon.lg { width: 20px; height: 20px }
 
 /* ── top bar ─────────────────────────────────────────── */
-.top {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--page);
-  border-bottom: 1px solid var(--line); margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
-  padding: 0 max(16px, env(safe-area-inset-left, 0px));
-}
-.top .wrap { display: flex; align-items: center; gap: 1.5rem; min-height: 56px; flex-wrap: wrap }
-.brand { display: flex; align-items: center; gap: .5rem; font-family: var(--font-head); font-weight: 600; font-size: 1.1rem }
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--page); border-bottom: 1px solid var(--line);
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: 0 max(16px, env(safe-area-inset-left, 0px)) }
+.top .wrap { display: flex; align-items: center; gap: 1.5rem; min-height: 56px }
+.brand { display: flex; align-items: center; gap: .5rem; font-family: var(--font-head); font-weight: 600; font-size: 1.1rem; white-space: nowrap }
 .brand svg { color: var(--accent-strong) }
+.brand small { font: 400 .8rem var(--font-body); color: var(--muted) }
 .nav { display: flex; gap: .25rem; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: none }
-.nav a { color: var(--muted); text-decoration: none; padding: .9rem .6rem; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; transition: color .16s }
+.nav a { color: var(--muted); text-decoration: none; padding: .9rem .55rem; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; transition: color .16s }
 .nav a:hover, .nav a.on { color: var(--fg); border-color: var(--accent) }
-.top-tools { display: flex; gap: .5rem; align-items: center }
+.iconbtn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; border: 0; background: none; cursor: pointer; color: var(--muted); transition: background .16s, color .16s }
+.iconbtn:hover { background: var(--sunk); color: var(--fg) }
+.iconbtn[aria-expanded="true"] { background: var(--accent-tint); color: var(--fg) }
 
-/* ── buttons, pills ─────────────────────────────────── */
-.btn {
-  display: inline-flex; align-items: center; gap: .4rem; height: 32px; padding: 0 14px; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: .92rem; transition: transform .16s, background .16s;
-}
+/* ── generic controls ─────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; gap: .4rem; height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: .92rem; transition: transform .16s, background .16s }
 .btn:hover { background: var(--sunk) }
 .btn:active { transform: scale(.985) }
-.btn.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff }
-:root[data-theme="dark"] .btn.primary { color: #002b36 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #002b36 } }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface) }
-.seg button { border: 0; background: none; padding: .2rem .75rem; border-radius: 999px; cursor: pointer; font-size: .85rem; color: var(--muted) }
-.seg button.on { background: var(--accent-tint); color: var(--fg); font-weight: 600 }
+.btn.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--surface) }
+.switchrow { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .45rem 0; cursor: pointer; user-select: none }
+.switchrow input { appearance: none; width: 32px; height: 18px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .16s; margin: 0; flex: none }
+.switchrow input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); transition: transform .16s var(--ease); box-shadow: 0 1px 2px #0003 }
+.switchrow input:checked { background: var(--accent-strong) }
+.switchrow input:checked::after { transform: translateX(14px) }
+select { font: 500 .88rem var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .3rem .5rem; cursor: pointer }
+kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--surface); color: var(--muted) }
+
+/* ── popover ──────────────────────────────────────────── */
+.pop { position: absolute; z-index: 30; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 36px #1a1a2e1f; padding: .9rem 1rem; width: min(340px, calc(100vw - 32px)); animation: rise .5s var(--ease) }
+@keyframes rise { from { opacity: 0; transform: translateY(8px) } }
+.pop h4 { margin: 0 0 .5rem; font: 600 .72rem var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.pop .tabs-mini { display: flex; gap: 1rem; border-bottom: 1px solid var(--line); margin: -.2rem 0 .8rem }
+.pop .tabs-mini button { border: 0; background: none; padding: .35rem 0; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: .88rem }
+.pop .tabs-mini button.on { color: var(--fg); border-color: var(--accent); font-weight: 600 }
+.pop .field { display: grid; gap: .25rem; margin-bottom: .65rem; font-size: .82rem; color: var(--muted) }
+.pop .note { font-size: .8rem; color: var(--muted); margin-bottom: .65rem }
+.pop .q { width: 100%; font: .84rem var(--font-mono); padding: .45rem .55rem; border: 1px solid var(--line); border-radius: 8px; background: var(--page); color: var(--fg) }
+.pop .q.err { border-color: var(--bad); background: var(--bad-tint) }
+.pop .err-msg { color: var(--bad); font-size: .78rem; margin-top: .3rem; display: flex; gap: .3rem; align-items: center }
+.cheat { width: 100%; border-collapse: collapse; font-size: .85rem }
+.cheat td { padding: .32rem 0; border-top: 1px solid var(--line-soft); vertical-align: top }
+.cheat td:first-child { font-family: var(--font-mono); font-size: .8rem; color: var(--accent-strong); padding-right: .9rem }
 
 /* ── sections ─────────────────────────────────────────── */
 section { padding-block: 3rem 1rem; scroll-margin-top: 64px }
 section + section { border-top: 1px solid var(--line) }
 .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem }
 .sec-head p { max-width: 65ch; color: var(--muted); margin-top: .35rem }
-.eyebrow { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600 }
-
-/* ── feedback pin ─────────────────────────────────────── */
-.fb { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px dashed var(--line); border-radius: 999px; background: var(--surface); vertical-align: middle; flex: none }
-.fb button { display: inline-flex; align-items: center; gap: .25rem; border: 0; background: none; cursor: pointer; padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; color: var(--muted); min-height: 26px }
-.fb button:hover { background: var(--sunk); color: var(--fg) }
-.fb button[aria-pressed="true"][data-v="want"] { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); font-weight: 700 }
-.fb button[aria-pressed="true"][data-v="maybe"] { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); font-weight: 700 }
-.fb button[aria-pressed="true"][data-v="nope"] { background: var(--bad-tint); color: var(--bad); font-weight: 700 }
-.fb .icon { width: 13px; height: 13px }
-body.no-pins .fb { display: none }
+.eyebrow { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600 }
 .pinrow { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap }
 
-/* ── philosophy ────────────────────────────────────────── */
-.principles { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden }
-.principle { background: var(--surface); padding: 1.1rem 1.2rem; display: grid; gap: .45rem; align-content: start }
-.principle p { color: var(--muted); font-size: .95rem }
-.recipe-flow { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 1.5rem 0 0; font-family: var(--font-mono); font-size: .85rem }
-.recipe-flow span { padding: .35rem .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface) }
-.recipe-flow i { color: var(--muted); font-style: normal }
-.plan { margin-top: 2rem; display: grid; gap: .5rem }
-.plan-row { display: grid; grid-template-columns: 3rem 1fr; gap: 1rem; padding: .75rem 0; border-top: 1px solid var(--line) }
-.plan-row b { font-family: var(--font-mono); color: var(--accent-strong); font-weight: 500 }
-.plan-row p { color: var(--muted); font-size: .95rem }
-.plan-row h3 { margin-bottom: .15rem }
+/* ── feedback pin (quiet) ─────────────────────────────── */
+.fb { display: inline-flex; align-items: center; gap: 1px; padding: 1px; border-radius: 999px; vertical-align: middle; flex: none; opacity: .7; transition: opacity .16s }
+.fb:hover, .fb:has([aria-pressed="true"]) { opacity: 1 }
+.fb button { display: inline-grid; place-items: center; border: 0; background: none; cursor: pointer; width: 28px; height: 26px; border-radius: 999px; color: var(--faint) }
+.fb button:hover { background: var(--sunk); color: var(--fg) }
+.fb button[aria-pressed="true"][data-v="want"]  { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok) }
+.fb button[aria-pressed="true"][data-v="maybe"] { background: color-mix(in srgb, var(--warn) 17%, transparent); color: var(--warn) }
+.fb button[aria-pressed="true"][data-v="nope"]  { background: var(--bad-tint); color: var(--bad) }
+.fb .icon { width: 14px; height: 14px }
 
-/* ── desktop app frame ────────────────────────────────── */
-.device { border: 1px solid var(--line); border-radius: 14px; background: var(--page); overflow: hidden; box-shadow: 0 8px 30px #1a1a2e12 }
+/* ── heard ────────────────────────────────────────────── */
+.heard { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem 2rem }
+.heard h3 { display: flex; align-items: center; gap: .4rem; padding-bottom: .45rem; border-bottom: 1px solid var(--line); margin-bottom: .5rem }
+.heard ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .3rem; font-size: .93rem }
+.heard li small { display: block; color: var(--muted); font-size: .84rem; line-height: 1.4 }
+.reads { margin-top: 2rem }
+.read { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1.5rem; padding: .85rem 0; border-top: 1px solid var(--line) }
+.read b { font-weight: 600 }
+.read p { color: var(--muted); font-size: .93rem }
+
+/* ── ladder ───────────────────────────────────────────── */
+.ladder { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden }
+.rung { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1.3fr) 100px; gap: 1.25rem; align-items: center; padding: .9rem 1.2rem; border-top: 1px solid var(--line-soft) }
+.rung:first-child { border-top: 0 }
+.rung .lvl { font: 500 .78rem var(--font-mono); color: var(--accent-strong) }
+.rung .who { font-size: .8rem; color: var(--muted) }
+.rung p { color: var(--muted); font-size: .92rem }
+.rung .bar { height: 6px; border-radius: 3px; background: var(--accent) }
+.calm-rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem 2rem; margin-top: 2rem }
+.calm-rules > div { display: grid; gap: .25rem; align-content: start }
+.calm-rules p { color: var(--muted); font-size: .92rem }
+
+/* ── app frame ────────────────────────────────────────── */
+.device { border: 1px solid var(--line); border-radius: 14px; background: var(--page); overflow: hidden; box-shadow: 0 8px 30px #1a1a2e10; position: relative }
 .chrome { display: flex; align-items: center; gap: .4rem; padding: .55rem .8rem; border-bottom: 1px solid var(--line); background: var(--surface) }
 .chrome i { width: 10px; height: 10px; border-radius: 50%; background: var(--line) }
 .chrome .url { margin-left: .75rem; font-family: var(--font-mono); font-size: .75rem; color: var(--muted) }
-.app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 640px }
+.app { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 600px }
 .side { border-right: 1px solid var(--line); background: var(--surface); padding: 1rem .6rem; display: flex; flex-direction: column; gap: 1.1rem; font-size: .92rem }
 .side h4 { margin: 0 0 .25rem .55rem; font: 600 .7rem/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
-.side a { display: flex; align-items: center; gap: .55rem; padding: .38rem .55rem; border-radius: var(--radius-sm); color: var(--fg); text-decoration: none; cursor: pointer }
+.side a { display: flex; align-items: center; gap: .55rem; padding: .38rem .55rem; border-radius: var(--radius-sm); color: var(--fg); text-decoration: none }
 .side a:hover { background: var(--sunk) }
 .side a.on { background: var(--accent-tint); font-weight: 600 }
 .side a .n { margin-left: auto; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums }
 .side .dot { width: 8px; height: 8px; border-radius: 50%; margin: 0 4px }
 .main { min-width: 0; display: flex; flex-direction: column }
-.toolbar { display: flex; align-items: center; gap: .75rem; padding: .9rem 1.1rem .6rem; flex-wrap: wrap }
-.toolbar h3 { font-size: 1.25rem; font-weight: 500; font-family: var(--font-head) }
-.toolbar .grow { flex: 1 }
+.toolbar { display: flex; align-items: center; gap: .5rem; padding: 1rem 1.1rem .7rem }
+.toolbar h3 { font: 500 1.3rem var(--font-head); margin-right: auto }
 
-/* ── quick add ─────────────────────────────────────────── */
-.qa { margin: 0 1.1rem .75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: .55rem .7rem; display: grid; gap: .45rem; transition: box-shadow .16s }
+/* ── quick add: one quiet line ────────────────────────── */
+.qa { margin: 0 1.1rem 1rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: .45rem .5rem .45rem .75rem; transition: box-shadow .16s, border-color .16s }
 .qa:focus-within { box-shadow: 0 0 0 5px var(--accent-tint); border-color: var(--accent) }
 .qa-line { display: flex; align-items: center; gap: .55rem }
 .qa-field { position: relative; flex: 1; min-width: 0 }
-.qa-field input, .qa-field .hl { font: 500 1rem/1.5 var(--font-body); padding: .2rem 0; width: 100%; border: 0; white-space: pre; letter-spacing: normal; word-spacing: normal }
+.qa-field input, .qa-field .hl { font: 500 1rem/1.5 var(--font-body); padding: .2rem 0; width: 100%; border: 0; white-space: pre }
 .qa-field input { position: relative; background: transparent; color: transparent; caret-color: var(--fg); outline: none; z-index: 1 }
-.qa-field input::placeholder { color: var(--muted) }
+.qa-field input::placeholder { color: var(--faint) }
 .qa-field .hl { position: absolute; inset: 0; pointer-events: none; color: var(--fg); overflow: hidden }
-.hl mark { background: none; border-radius: 4px; box-shadow: inset 0 -2px 0 currentColor }
-.k-proj { color: var(--accent-strong) } .k-label { color: var(--p2) } .k-prio { color: var(--p1) }
-.k-due { color: var(--ok) } .k-deadline { color: var(--bad) } .k-time { color: var(--ok) }
-.chips { display: flex; gap: .35rem; flex-wrap: wrap; min-height: 24px }
-.chip { display: inline-flex; align-items: center; gap: .3rem; font: 500 .78rem/1 var(--font-meta); padding: .3rem .5rem; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap }
+.hl mark { background: none; color: var(--accent-strong) }
+.qa-chips { display: flex; gap: .3rem; flex-wrap: wrap; padding: .35rem 0 .1rem 1.6rem }
+.chip { display: inline-flex; align-items: center; gap: .3rem; font: 500 .76rem/1 var(--font-body); padding: .28rem .5rem; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap }
 .chip .icon { width: 12px; height: 12px }
-.chip.proj { color: var(--accent-strong) } .chip.label { color: var(--p2) } .chip.due { color: var(--ok) } .chip.deadline { color: var(--bad) }
-.chip.overdue { color: var(--bad); background: var(--bad-tint) }
-.qa-help { font-size: .78rem; color: var(--muted); display: flex; gap: .9rem; flex-wrap: wrap }
-.qa-help code { font-family: var(--font-mono); color: var(--fg) }
-kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--surface); color: var(--muted) }
+.chip.deadline .icon { color: var(--bad) }
+.chip.prio1 .icon { color: var(--p1) } .chip.prio2 .icon { color: var(--p2) } .chip.prio3 .icon { color: var(--p3) }
 
 /* ── board ────────────────────────────────────────────── */
-.boardbar { display: flex; align-items: center; gap: .75rem; padding: 0 1.1rem .75rem; flex-wrap: wrap; font-size: .85rem }
-.switch { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; user-select: none }
-.switch input { appearance: none; width: 32px; height: 18px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .16s; margin: 0 }
-.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); transition: transform .16s var(--ease); box-shadow: 0 1px 2px #0003 }
-.switch input:checked { background: var(--accent-strong) }
-.switch input:checked::after { transform: translateX(14px) }
-.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: .75rem; padding: 0 1.1rem 1.1rem; overflow-x: auto; align-items: start; flex: 1 }
-.col { background: var(--sunk); border-radius: var(--radius); padding: .6rem; display: flex; flex-direction: column; gap: .45rem; min-width: 0 }
-.col-head { display: flex; align-items: center; gap: .4rem; padding: .1rem .2rem }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: .9rem; padding: 0 1.1rem 1.1rem; overflow-x: auto; align-items: start; flex: 1 }
+.col { border-radius: var(--radius); padding: .3rem; display: flex; flex-direction: column; gap: var(--row-gap); min-width: 0; min-height: 120px; transition: background .16s }
+.col.over { background: var(--accent-tint) }
+.col-head { display: flex; align-items: center; gap: .45rem; padding: .2rem .3rem .35rem }
 .col-head h3 { font-size: .95rem }
-.col-head .n { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums }
-.col-head select { margin-left: auto; font: 500 .75rem var(--font-body); border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: .15rem .4rem; cursor: pointer }
-.q { display: flex; align-items: center; gap: .35rem; font-family: var(--font-mono); font-size: .76rem; padding: .3rem .5rem; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); color: var(--muted); cursor: text; min-width: 0 }
-.q input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; color: var(--fg); outline: none; padding: 0 }
-.q.err { border-color: var(--bad); background: var(--bad-tint) }
-.q-err { font-size: .72rem; color: var(--bad); padding: 0 .2rem }
-.card { background: var(--surface); border-radius: var(--radius-sm); padding: var(--row-pad); box-shadow: var(--card-shadow); border: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr; gap: .15rem .55rem; align-items: start; transition: opacity .3s, transform .3s var(--ease) }
-.card:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)) }
+.col-head .n { color: var(--faint); font-size: .82rem; font-variant-numeric: tabular-nums }
+.col-head .iconbtn { margin-left: auto; width: 28px; height: 28px; opacity: 0; transition: opacity .16s }
+.col:hover .col-head .iconbtn, .col-head .iconbtn:focus-visible, .col-head .iconbtn[aria-expanded="true"] { opacity: 1 }
+@media (hover: none) { .col-head .iconbtn { opacity: 1 } }
+.col-head .warn { color: var(--bad); display: inline-flex }
+.card { background: var(--surface); border-radius: var(--radius-sm); padding: var(--row-pad); box-shadow: var(--card-shadow); border: 1px solid var(--line-soft); display: grid; grid-template-columns: auto 1fr; gap: .2rem .55rem; align-items: start; transition: opacity .3s, transform .3s var(--ease), border-color .16s; cursor: grab }
+.card:hover { border-color: var(--line) }
+.card.dragging { opacity: .4 }
 .card.done { opacity: 0; transform: translateX(8px) }
 .card .t { font-size: .92rem; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere }
-.card .meta { grid-column: 2; display: flex; gap: .3rem; flex-wrap: wrap }
-.card .meta .chip { padding: .2rem .4rem; font-size: .72rem }
-.check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--p4); background: none; cursor: pointer; margin-top: 1px; padding: 0; position: relative }
+.card .meta { grid-column: 2; display: flex; gap: .55rem; flex-wrap: wrap; font-size: .76rem; color: var(--muted) }
+.card .meta:empty { display: none }
+.card .meta span { display: inline-flex; align-items: center; gap: .22rem }
+.card .meta .icon { width: 12px; height: 12px }
+.card .meta .late { color: var(--bad) }
+.card .meta .dl .icon { color: var(--bad) }
+[data-density="compact"] .card { grid-template-columns: auto 1fr auto; align-items: center }
+[data-density="compact"] .card .meta { grid-column: auto; grid-row: 1 }
+[data-density="compact"] .card .meta .lbl { display: none }
+.check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--p4); background: none; cursor: pointer; margin-top: 1px; padding: 0; position: relative; flex: none }
 .check::after { content: ""; position: absolute; inset: 0; margin: auto; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0; transition: opacity .16s }
 .check:hover::after { opacity: .35 }
-.check.p1 { border-color: var(--p1); color: var(--p1); background: color-mix(in srgb, var(--p1) 10%, transparent) }
-.check.p2 { border-color: var(--p2); color: var(--p2); background: color-mix(in srgb, var(--p2) 10%, transparent) }
+.check.p1 { border-color: var(--p1); color: var(--p1); background: color-mix(in srgb, var(--p1) 9%, transparent) }
+.check.p2 { border-color: var(--p2); color: var(--p2); background: color-mix(in srgb, var(--p2) 9%, transparent) }
 .check.p3 { border-color: var(--p3); color: var(--p3) }
-[data-look="ledger"] .check { border-radius: 2px }
-[data-look="ledger"] .card { grid-template-columns: auto 1fr auto; align-items: center }
-[data-look="ledger"] .card .meta { grid-column: auto; grid-row: 1 }
-[data-look="ledger"] .board { grid-auto-columns: minmax(270px, 1fr) }
-.empty { font-size: .82rem; color: var(--muted); padding: .8rem .4rem; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius-sm) }
-.addcol { align-self: stretch; display: flex; align-items: flex-start; justify-content: center; padding-top: .6rem; border: 1px dashed var(--line); border-radius: var(--radius); background: none; cursor: pointer; color: var(--muted); min-width: 160px }
-.addcol:hover { color: var(--fg); background: var(--sunk) }
+.empty { font-size: .82rem; color: var(--faint); padding: .9rem .4rem; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius-sm) }
+.toast { position: absolute; left: 50%; bottom: 1rem; translate: -50% 0; z-index: 25; background: var(--fg); color: var(--page); padding: .5rem 1rem; border-radius: 999px; font-size: .88rem; display: flex; gap: .75rem; align-items: center; box-shadow: 0 8px 24px #0003; animation: rise .5s var(--ease); max-width: calc(100% - 2rem) }
+.toast button { border: 0; background: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: .2rem .3rem }
+.recipe { margin: 0 1.1rem 1rem; font: .78rem/1.6 var(--font-mono); background: var(--sunk); padding: .8rem 1rem; border-radius: var(--radius-sm); overflow-x: auto; color: var(--fg) }
+.under-note { margin-top: 1rem; display: flex; gap: .5rem 1.5rem; flex-wrap: wrap; font-size: .88rem; color: var(--muted) }
+.under-note > span { display: inline-flex; align-items: center; gap: .3rem }
 
-.under { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1.25rem; margin-top: 1.25rem }
-.panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 1rem 1.1rem; min-width: 0 }
-.panel h3 { margin-bottom: .5rem }
-.panel pre { margin: .5rem 0 0; font: .78rem/1.55 var(--font-mono); background: var(--sunk); padding: .75rem .9rem; border-radius: var(--radius-sm); overflow-x: auto; color: var(--fg) }
-.grammar { width: 100%; border-collapse: collapse; font-size: .85rem }
-.grammar td { padding: .4rem .3rem; border-top: 1px solid var(--line); vertical-align: top }
-.grammar td:first-child { font-family: var(--font-mono); white-space: nowrap; color: var(--accent-strong); padding-right: 1rem }
+/* ── capture research ─────────────────────────────────── */
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2rem; align-items: start }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface) }
+.cost { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 420px }
+.cost th, .cost td { padding: .5rem .8rem; text-align: left; border-top: 1px solid var(--line-soft) }
+.cost th { font: 600 .72rem var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-top: 0; background: var(--sunk) }
+.cost td:first-child { font-family: var(--font-mono); font-size: .95rem }
+.cost td.n { font-variant-numeric: tabular-nums; white-space: nowrap }
+.taps { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: .4rem }
+.taps i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-strong) }
+.taps i.x { background: var(--p1) }
+.cost tr.rec td:last-child { color: var(--ok); font-weight: 600 }
+.cost tr.bad td:last-child { color: var(--bad); font-weight: 600 }
+.syntax { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden }
+.syntax > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 1rem; padding: .6rem 1rem; border-top: 1px solid var(--line-soft); align-items: baseline }
+.syntax > div:first-child { border-top: 0 }
+.syntax code { color: var(--accent-strong); font-size: .86rem }
+.syntax p { font-size: .9rem }
+.syntax small { color: var(--muted); display: block; font-size: .82rem }
+.fineprint { font-size: .8rem; color: var(--muted); margin-top: .6rem; max-width: 65ch }
 
-/* ── mobile ────────────────────────────────────────────── */
-.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1.5rem; justify-items: center }
-.phone-wrap { display: grid; gap: .6rem; justify-items: center; width: 100% }
-.phone { width: 100%; max-width: 300px; aspect-ratio: 9 / 19; border-radius: 36px; border: 8px solid #1a1a2e; background: var(--page); overflow: hidden; position: relative; display: flex; flex-direction: column; font-size: .85rem }
-:root[data-theme="dark"] .phone { border-color: #000 }
+/* ── mobile ───────────────────────────────────────────── */
+.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; justify-items: center }
+.phone-wrap { display: grid; gap: .6rem; justify-items: center; width: 100%; align-content: start }
+.phone { width: 100%; max-width: 290px; aspect-ratio: 9 / 19; border-radius: 36px; border: 8px solid #1a1a2e; background: var(--page); overflow: hidden; position: relative; display: flex; flex-direction: column; font-size: .85rem }
 .statusbar { display: flex; justify-content: space-between; padding: .55rem 1.1rem .2rem; font: 600 .7rem var(--font-body) }
 .phone .notch { position: absolute; top: 6px; left: 50%; translate: -50% 0; width: 78px; height: 20px; border-radius: 999px; background: #000 }
-.home { flex: 1; padding: .9rem; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 54px; gap: .7rem; align-content: start;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 45%, var(--page)), color-mix(in srgb, var(--p1) 22%, var(--page))) }
-.appicon { border-radius: 14px; background: color-mix(in srgb, var(--surface) 70%, transparent) }
+.home { flex: 1; padding: 1rem .9rem; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 52px; gap: .8rem .7rem; align-content: start;
+  background: linear-gradient(165deg, color-mix(in srgb, var(--accent) 40%, var(--page)), color-mix(in srgb, var(--accent-strong) 25%, var(--page))) }
+.appicon { border-radius: 14px; background: color-mix(in srgb, var(--surface) 65%, transparent) }
 .widget { border-radius: 20px; background: var(--surface); box-shadow: 0 4px 14px #0002; padding: .6rem .7rem; display: flex; flex-direction: column; gap: .35rem; overflow: hidden }
-.w-1x1 { grid-column: span 1; align-items: center; justify-content: center; background: var(--accent-strong); color: #fff; padding: 0 }
-.w-4x1 { grid-column: span 4; flex-direction: row; align-items: center; gap: .5rem }
-.w-4x1 .fake-in { flex: 1; color: var(--muted); font-size: .8rem }
-.w-4x1 .mic { width: 30px; height: 30px; border-radius: 50%; background: var(--sunk); display: grid; place-items: center; color: var(--accent-strong) }
-.w-2x2 { grid-column: span 2; grid-row: span 2 }
+.w-1x1 { align-items: center; justify-content: center; background: var(--accent-strong); color: var(--surface); padding: 0; border-radius: 14px }
 .w-4x2 { grid-column: span 4; grid-row: span 2 }
 .widget h5 { margin: 0; font: 600 .72rem var(--font-body); color: var(--muted); display: flex; justify-content: space-between }
 .wrow { display: flex; gap: .4rem; align-items: center; font-size: .74rem; line-height: 1.25 }
 .wrow .check { width: 13px; height: 13px; margin: 0; border-width: 1.2px }
 .wrow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.wlbl { font-size: .62rem; text-align: center; color: var(--fg); grid-column: span 1; align-self: start; margin-top: -.6rem }
-.sheet-bg { flex: 1; background: color-mix(in srgb, var(--fg) 25%, var(--page)); display: flex; flex-direction: column; justify-content: flex-end }
-.sheet { background: var(--surface); border-radius: 18px 18px 0 0; padding: .9rem; display: grid; gap: .6rem }
-.sheet .grab { width: 36px; height: 4px; border-radius: 4px; background: var(--line); margin: -.3rem auto .2rem }
-.sheet .typed { font-size: .95rem; font-weight: 500; line-height: 1.4; min-height: 2.6em; overflow-wrap: anywhere }
-.sheet .acts { display: flex; gap: .4rem; color: var(--muted); align-items: center }
-.sheet .acts .send { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: var(--accent-strong); color: #fff; display: grid; place-items: center }
-.kbd { background: var(--sunk); padding: .5rem .3rem 1rem; display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px }
-.kbd i { height: 30px; border-radius: 5px; background: var(--surface); box-shadow: 0 1px 0 var(--line) }
+.sheet-bg { flex: 1; background: color-mix(in srgb, var(--fg) 22%, var(--page)); display: flex; flex-direction: column; justify-content: flex-end }
+.sheet { background: var(--surface); border-radius: 18px 18px 0 0; padding: .9rem .9rem .6rem; display: grid; gap: .55rem }
+.sheet .grab { width: 36px; height: 4px; border-radius: 4px; background: var(--line); margin: -.3rem auto .1rem }
+.sheet .typed { font-size: .95rem; font-weight: 500; line-height: 1.4; min-height: 2.7em; overflow-wrap: anywhere }
+.sheet .chips { display: flex; gap: .25rem; flex-wrap: wrap; min-height: 22px }
+.sheet .chip { font-size: .68rem; padding: .22rem .4rem }
+.accessory { display: flex; gap: .3rem; align-items: center; border-top: 1px solid var(--line-soft); padding-top: .5rem }
+.accessory span { display: grid; place-items: center; min-width: 32px; height: 30px; padding: 0 .45rem; border-radius: 8px; background: var(--sunk); font: 600 .8rem var(--font-body); color: var(--fg) }
+.accessory .send { margin-left: auto; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-strong); color: var(--surface); padding: 0 }
+.kbd { background: var(--sunk); padding: .45rem .3rem .9rem; display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px }
+.kbd i { height: 28px; border-radius: 5px; background: var(--surface); box-shadow: 0 1px 0 var(--line) }
 .kbd i.w { grid-column: span 6 } .kbd i.m { grid-column: span 2 }
 .m-head { padding: .4rem 1rem .6rem; display: flex; align-items: center; justify-content: space-between }
 .m-head h4 { margin: 0; font: 500 1.2rem var(--font-head) }
@@ -239,35 +263,34 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
 .m-lanes button.on { border-color: var(--accent); background: var(--accent-tint); color: var(--fg); font-weight: 600 }
 .m-lanes b { font-variant-numeric: tabular-nums; margin-left: .25rem; font-weight: 600 }
 .m-list { flex: 1; overflow-y: auto; padding: 0 .8rem; display: flex; flex-direction: column; gap: .4rem }
-.m-list .card { padding: .5rem .6rem }
+.m-list .card { padding: .5rem .6rem; cursor: default }
 .m-list .card .t { font-size: .82rem }
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: var(--surface); position: relative }
+.swipe-hint { position: relative; overflow: hidden; border-radius: var(--radius-sm); flex: none }
+.swipe-hint .under { position: absolute; inset: 0; background: var(--accent-strong); color: var(--surface); display: flex; align-items: center; justify-content: flex-end; padding: 0 .8rem; font-size: .72rem; font-weight: 700; gap: .3rem }
+.swipe-hint .card { position: relative; animation: swipe 4.5s var(--ease) infinite }
+@keyframes swipe { 0%, 35%, 100% { transform: none } 50%, 70% { transform: translateX(-38%) } }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: var(--surface) }
 .tabs span { display: grid; place-items: center; padding: .65rem 0 .9rem; color: var(--muted); border-top: 3px solid transparent; margin-top: -1px }
 .tabs span.on { color: var(--accent-strong); border-top-color: var(--accent) }
-.fab { position: absolute; right: 14px; bottom: 62px; width: 46px; height: 46px; border-radius: 50%; background: var(--accent-strong); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 16px #0003 }
-.phone-cap { text-align: center; max-width: 300px; display: grid; gap: .35rem; justify-items: center }
+.fab { position: absolute; right: 14px; bottom: 62px; width: 46px; height: 46px; border-radius: 50%; background: var(--accent-strong); color: var(--surface); display: grid; place-items: center; box-shadow: 0 6px 16px #0003 }
+.phone-cap { text-align: center; max-width: 290px; display: grid; gap: .35rem; justify-items: center }
 .phone-cap p { font-size: .88rem; color: var(--muted) }
 
-/* ── styles ────────────────────────────────────────────── */
-.looks { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem }
-.look { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 1.1rem; display: grid; gap: .9rem; align-content: start; min-width: 0 }
-.look .swatches { display: flex; gap: .35rem }
-.look .swatches i { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line) }
-.look .spec { font-size: .85rem; color: var(--muted) }
-.look .demo { display: grid; gap: .4rem; padding: .75rem; background: var(--page); border-radius: 10px }
+/* ── options ──────────────────────────────────────────── */
+.opts { display: grid; gap: 1.75rem }
+.opt h3 { margin-bottom: .2rem }
+.opt > p { color: var(--muted); font-size: .92rem; max-width: 70ch; margin-bottom: .7rem }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .75rem }
+.choice { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: .8rem .9rem; display: grid; gap: .35rem; align-content: start; min-width: 0 }
+.choice.rec { border-color: color-mix(in srgb, var(--accent) 75%, var(--line)) }
+.choice .pinrow b { font-weight: 600; font-size: .95rem }
+.choice code { color: var(--accent-strong) }
+.choice p { font-size: .86rem; color: var(--muted) }
+.rec-tag { font: 700 .68rem var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--accent-strong) }
 
-/* ── features ──────────────────────────────────────────── */
-.feat-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem 2rem }
-.feat-group h3 { padding-bottom: .5rem; border-bottom: 1px solid var(--line); margin-bottom: .2rem }
-.feat { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid var(--line) }
-.feat b { font-weight: 600; display: block; font-size: .95rem }
-.feat small { color: var(--muted); font-size: .84rem; display: block; line-height: 1.4 }
-.feat > div { min-width: 0 }
-
-/* ── marks drawer ──────────────────────────────────────── */
+/* ── marks drawer ─────────────────────────────────────── */
 .marks-btn { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; box-shadow: 0 6px 20px #0002 }
 .drawer { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 20; width: min(380px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 40px #0003; padding: 1rem; display: grid; gap: .6rem; animation: rise .5s var(--ease) }
-@keyframes rise { from { opacity: 0; transform: translateY(8px) } }
 .drawer .mrow { display: grid; gap: .3rem; padding-bottom: .6rem; border-bottom: 1px solid var(--line) }
 .drawer .mrow > div { display: flex; justify-content: space-between; gap: .5rem; align-items: center; font-size: .88rem }
 .drawer textarea { width: 100%; font: .85rem/1.4 var(--font-body); border: 1px solid var(--line); border-radius: 8px; padding: .4rem .55rem; background: var(--page); color: var(--fg); resize: vertical; min-height: 2.2rem }
@@ -277,113 +300,190 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
 .tag.nope { color: var(--bad); background: var(--bad-tint) }
 .sync { font-size: .75rem; color: var(--muted) }
 
-/* ── responsive ────────────────────────────────────────── */
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr }
   .side { display: none }
-  .under { grid-template-columns: 1fr }
-}
-@media (max-width: 520px) {
-  .qa-help { display: none }
-  .top-tools .seg { display: none }
+  .two, .read { grid-template-columns: 1fr }
+  .read { gap: .25rem }
+  .rung { grid-template-columns: 3.5rem minmax(0, 1fr) }
+  .rung > p { grid-column: 2 }
+  .rung .bar { display: none }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important } }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-hash" viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></symbol>
-  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
   <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
   <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
   <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-cols" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></symbol>
   <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
-  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
-  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88"/></symbol>
   <symbol id="i-maybe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
-  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5"/></symbol>
-  <symbol id="i-sift" viewBox="0 0 24 24"><path d="M3 5h18M6 12h12M10 19h4"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h6"/><path d="m15 17 2 2 4-4"/></symbol>
   <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
-  <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r=".5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
 </svg>
 
 <header class="top">
   <div class="wrap">
-    <div class="brand"><svg class="icon lg"><use href="#i-sift"/></svg>Sift <span class="muted" style="font-weight:400;font-size:.85rem">prototype · not real data</span></div>
+    <div class="brand"><svg class="icon lg"><use href="#i-logo"/></svg>Dolist <small>round 2</small></div>
     <nav class="nav" id="nav">
-      <a href="#philosophy">Philosophy</a>
-      <a href="#desktop">Desktop</a>
+      <a href="#heard">What I heard</a>
+      <a href="#ladder">Easy · possible</a>
+      <a href="#capture">Capture</a>
+      <a href="#board">Board</a>
       <a href="#mobile">Mobile</a>
-      <a href="#styles">Styles</a>
-      <a href="#features">Feature menu</a>
+      <a href="#options">Options</a>
     </nav>
-    <div class="top-tools">
-      <div class="seg" role="group" aria-label="Style direction">
-        <button data-look-set="calm" class="on">Calm</button><button data-look-set="ledger">Ledger</button>
-      </div>
-      <button class="btn" id="themeBtn" aria-label="Toggle theme"><svg class="icon"><use href="#i-moon"/></svg></button>
-      <label class="switch" title="Show want / maybe / nope pins"><input type="checkbox" id="pinsToggle" checked> <span class="muted" style="font-size:.85rem">Pins</span></label>
-    </div>
+    <button class="iconbtn" id="themeBtn" aria-label="Toggle light or dark"><svg class="icon"><use href="#i-moon"/></svg></button>
   </div>
 </header>
 
 <main class="wrap">
 
-<!-- ═══════════════ PHILOSOPHY ═══════════════ -->
-<section id="philosophy">
+<!-- ═══════════════ HEARD ═══════════════ -->
+<section id="heard">
   <div class="sec-head">
     <div>
-      <div class="eyebrow">Thesis</div>
-      <h2>Retrieval should drive layout</h2>
-      <p>Todoist nails capture and filtering, then stops. In Sift a view is a saved recipe. Board, list, calendar and widget are just different renderers of the same recipe, and every recipe is editable text.</p>
+      <div class="eyebrow">Round 1 · 50 marks</div>
+      <h2>What I heard</h2>
+      <p>Your marks, condensed. Below them is how I read the tensions. Round 1 features you marked nope are gone from this page.</p>
     </div>
   </div>
-  <div class="recipe-flow" aria-label="Recipe pipeline">
-    <span>source</span><i>→</i><span>lanes (each a filter)</span><i>→</i><span>sort</span><i>→</i><span>group</span><i>→</i><span>render: board · list · calendar · widget</span>
+  <div class="heard">
+    <div><h3><svg class="icon" style="color:var(--ok)"><use href="#i-check"/></svg>Keep</h3><ul>
+      <li>Filter-lane board, editable queries, views as text</li>
+      <li>Two dates, local-first, Todoist import</li>
+      <li>Shorthand, share sheet, desktop hotkey</li>
+      <li>Custom fields, subtasks, dependencies, recurrence</li>
+      <li>Plugins, API and CLI, themes</li>
+      <li>1×1 add widget, lane widget, capture sheet</li>
+    </ul></div>
+    <div><h3><svg class="icon" style="color:var(--bad)"><use href="#i-x"/></svg>Drop</h3><ul>
+      <li>Calendar view and calendar overlay</li>
+      <li>Weekly review mode, AI triage</li>
+      <li>Voice capture, watch app, capture-bar widget</li>
+      <li>Capture templates, formula fields</li>
+      <li>Self-hosted sync server</li>
+    </ul></div>
+    <div><h3><svg class="icon" style="color:var(--warn)"><use href="#i-maybe"/></svg>Open</h3><ul>
+      <li>Deadline syntax <small>Hard to type on phones. See Capture.</small></li>
+      <li>Quick-add presentation <small>Too busy. Rebuilt below.</small></li>
+      <li>Grouping within lanes, urgency score</li>
+    </ul></div>
   </div>
 
-  <div class="principles" style="margin-top:1.5rem">
-    <div class="principle"><div class="pinrow"><h3>Capture in under 2 seconds</h3><span data-fb="p-capture"></span></div><p>Widgets, global hotkey, share sheet, email-in. Everything lands in Inbox unless the text says otherwise.</p></div>
-    <div class="principle"><div class="pinrow"><h3>One grammar</h3><span data-fb="p-grammar"></span></div><p>Quick-add shorthand, filter queries and recipes share syntax. <code class="mono">#home @call p1</code> means the same thing everywhere.</p></div>
-    <div class="principle"><div class="pinrow"><h3>Views are data</h3><span data-fb="p-data"></span></div><p>Plain-text recipes you can copy, paste, diff, version and share. No setting lives only in a UI toggle.</p></div>
-    <div class="principle"><div class="pinrow"><h3>Lanes can cascade</h3><span data-fb="p-cascade"></span></div><p>First match wins, so Today, Week, Month and Quarter form horizons instead of duplicates. Overlap is one switch away.</p></div>
-    <div class="principle"><div class="pinrow"><h3>Two dates</h3><span data-fb="p-dates"></span></div><p><b>Scheduled</b> is when I plan to do it. <b>Deadline</b> is when it must be done. Filters can address either or both.</p></div>
-    <div class="principle"><div class="pinrow"><h3>Presets are recipes</h3><span data-fb="p-presets"></span></div><p>Ship opinionated defaults, but each one opens as an editable recipe. Simple by default, deep on demand.</p></div>
-    <div class="principle"><div class="pinrow"><h3>Keys and thumbs</h3><span data-fb="p-parity"></span></div><p>Every action has a keyboard shortcut on desktop and a gesture on mobile.</p></div>
-    <div class="principle"><div class="pinrow"><h3>Local-first</h3><span data-fb="p-local"></span></div><p>Capture works offline, always. Sync is a background concern, never a spinner.</p></div>
-  </div>
-
-  <div class="plan">
-    <div class="sec-head" style="margin:2rem 0 0"><div><div class="eyebrow">Research plan</div><h2 style="font-size:1.3rem">Six tracks; the first five run in parallel</h2></div></div>
-    <div class="plan-row"><b>R1</b><div><h3>Landscape teardown</h3><p>Todoist, TickTick, Things, OmniFocus perspectives, Linear views, Amazing Marvin strategies, Taskwarrior urgency, Obsidian Tasks and Dataview. Output: feature matrix and a list of ideas to borrow.</p></div></div>
-    <div class="plan-row"><b>R2</b><div><h3>Grammar</h3><p>One syntax for capture and filters. Decide on Todoist compatibility. Test against 50 real tasks from your account.</p></div></div>
-    <div class="plan-row"><b>R3</b><div><h3>Platform capabilities</h3><p>iOS interactive widgets (App Intents), Android Glance, Tauri global hotkey, PWA share target. Can a widget take text inline, or must it open a sheet?</p></div></div>
-    <div class="plan-row"><b>R4</b><div><h3>Sync and stack</h3><p>Local-first engines (Zero, PowerSync, ElectricSQL, Automerge, Yjs) against offline capture, conflicts, web plus native, self-hosting.</p></div></div>
-    <div class="plan-row"><b>R5</b><div><h3>Extensibility tiers</h3><p>Recipes, then computed fields, then sandboxed plugins, then API and webhooks. Which tiers ship in v1?</p></div></div>
-    <div class="plan-row"><b>R6</b><div><h3>Validate</h3><p>Use this page: mark what you want, then dogfood a clickable build against your real week. Depends on R1–R5.</p></div></div>
+  <div class="reads">
+    <div class="read"><b>Cascade: concept yes, toolbar switch no</b><p>The idea stays. The switch moved into view settings as "Show each task once", on by default. A setting you flip once a year shouldn't sit on the main screen.</p></div>
+    <div class="read"><b>Calm and Ledger both marked want</b><p>Read as one look plus a density setting. Compact keeps the structure and drops padding and label text.</p></div>
+    <div class="read"><b>No calendar views</b><p>Time is expressed through lanes ("Today", "Next 7 days"), not grids. Renderers shrink to board and list.</p></div>
+    <div class="read"><b>Plugins and API in, formulas out</b><p>Power users get code-level extension. In-app spreadsheet logic was a halfway step that added UI weight.</p></div>
   </div>
 </section>
 
-<!-- ═══════════════ DESKTOP ═══════════════ -->
-<section id="desktop">
+<!-- ═══════════════ LADDER ═══════════════ -->
+<section id="ladder">
+  <div class="sec-head">
+    <div>
+      <div class="eyebrow">Philosophy</div>
+      <h2>Common actions easy, uncommon actions possible</h2>
+      <p>Each rung is reachable from the one below through a single quiet door: a menu item, a tab, a "?" marker. Nobody has to climb. No rung shows the machinery of the rung above it.</p>
+    </div>
+    <span data-fb="r2-ladder" data-fb-label="The ladder"></span>
+  </div>
+
+  <div class="ladder">
+    <div class="rung"><span class="lvl">Rung 0</span><div><h3>Type, press Enter</h3><span class="who">every user, every day</span></div><p>Text goes to Inbox. No syntax required, nothing to learn.</p><span class="bar" style="width:100%"></span></div>
+    <div class="rung"><span class="lvl">Rung 1</span><div><h3>Words that mean things</h3><span class="who">after a week</span></div><p>"tomorrow", "by fri", #home. Recognized parts turn quietly blue. The cheatsheet sits behind a "?".</p><span class="bar" style="width:80%"></span></div>
+    <div class="rung"><span class="lvl">Rung 2</span><div><h3>Pick a view, drag tasks</h3><span class="who">first setup</span></div><p>Presets like Horizons and Deadlines. Drag between lanes and dates update.</p><span class="bar" style="width:60%"></span></div>
+    <div class="rung"><span class="lvl">Rung 3</span><div><h3>Shape a lane</h3><span class="who">occasionally</span></div><p>Lane menu → Simple tab: which date, how far ahead, which project, sort.</p><span class="bar" style="width:40%"></span></div>
+    <div class="rung"><span class="lvl">Rung 4</span><div><h3>Edit as text</h3><span class="who">power users</span></div><p>Same menu, Text tab: the full query language. The whole view also exists as copyable text.</p><span class="bar" style="width:24%"></span></div>
+    <div class="rung"><span class="lvl">Rung 5</span><div><h3>Code</h3><span class="who">rare</span></div><p>Plugins, API, CLI. New field types, renderers, automations.</p><span class="bar" style="width:12%"></span></div>
+  </div>
+
+  <div class="calm-rules">
+    <div><div class="pinrow"><h3>Show results, hide machinery</h3><span data-fb="r2-calm-results" data-fb-label="Show results, hide machinery"></span></div><p>Lanes show names and counts. Queries appear only inside a lane's editor.</p></div>
+    <div><div class="pinrow"><h3>Recognition, not instruction</h3><span data-fb="r2-calm-recog" data-fb-label="Recognition, not instruction"></span></div><p>Quick add shows what it understood after you typed it, not a legend of what you could type.</p></div>
+    <div><div class="pinrow"><h3>Controls appear on intent</h3><span data-fb="r2-calm-hover" data-fb-label="Controls appear on intent"></span></div><p>Lane menus fade in on hover and stay visible on touch screens. One sliders icon per view holds its settings.</p></div>
+    <div><div class="pinrow"><h3>One accent, few signals</h3><span data-fb="r2-calm-accent" data-fb-label="One accent, few signals"></span></div><p>Priority shows only on the checkbox ring. Deadlines use one red flag. Everything else is muted.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════════ CAPTURE ═══════════════ -->
+<section id="capture">
+  <div class="sec-head">
+    <div>
+      <div class="eyebrow">Practical · thumbs first</div>
+      <h2>Syntax you can type with one thumb</h2>
+      <p>Every symbol costs taps on a phone keyboard: switch layer, tap the key, switch back. Plain words cost no switches. Rule: <b>words for what's common, cheap prefixes for the rest</b>, and an accessory key for the one expensive character worth keeping.</p>
+    </div>
+  </div>
+
+  <div class="two">
+    <div>
+      <div class="pinrow" style="margin-bottom:.6rem"><h3>Taps from the letter keyboard</h3><span data-fb="r2-cost" data-fb-label="Tap-cost reasoning"></span></div>
+      <div class="table-wrap">
+        <table class="cost">
+          <thead><tr><th>Token</th><th>iOS</th><th>Gboard</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr class="rec"><td>by fri</td><td class="n">letters only</td><td class="n">letters only</td><td>Free</td></tr>
+            <tr class="rec"><td>@</td><td class="n"><span class="taps"><i></i><i></i></span>2</td><td class="n"><span class="taps"><i></i><i></i></span>2</td><td>Cheap</td></tr>
+            <tr class="rec"><td>!</td><td class="n"><span class="taps"><i></i><i></i></span>2</td><td class="n"><span class="taps"><i></i><i></i></span>2</td><td>Cheap</td></tr>
+            <tr class="rec"><td>!1</td><td class="n"><span class="taps"><i></i><i></i><i></i></span>3</td><td class="n"><span class="taps"><i></i><i></i><i></i></span>3</td><td>Digit on same layer</td></tr>
+            <tr><td>p1</td><td class="n"><span class="taps"><i></i><i></i><i></i></span>3</td><td class="n"><span class="taps"><i></i><i></i><i></i></span>3</td><td>Same cost</td></tr>
+            <tr><td>:</td><td class="n"><span class="taps"><i></i><i></i></span>2</td><td class="n"><span class="taps"><i></i><i></i></span>2</td><td>Cheap</td></tr>
+            <tr><td>#</td><td class="n"><span class="taps"><i></i><i></i><i class="x"></i></span>3</td><td class="n"><span class="taps"><i></i><i></i></span>2</td><td>Deep on iOS</td></tr>
+            <tr class="bad"><td>{ }</td><td class="n"><span class="taps"><i></i><i></i><i class="x"></i><i></i><i></i><i class="x"></i></span>6+</td><td class="n"><span class="taps"><i></i><i></i><i class="x"></i><i></i><i></i><i class="x"></i></span>6+</td><td>Dropped</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fineprint">Stock English layouts, not counting the tap back to letters. iOS has <code>@ ! $ : ( )</code> on the 123 layer and <code># % * { }</code> one layer deeper (red dot). Gboard has most symbols on ?123. Long-press shortcuts vary by keyboard. To verify on real devices in track R3.</p>
+    </div>
+
+    <div>
+      <div class="pinrow" style="margin-bottom:.6rem"><h3>Proposed grammar</h3><span data-fb="r2-grammar" data-fb-label="Proposed grammar"></span></div>
+      <div class="syntax">
+        <div><code>fri · tomorrow<br>in 3 days · 12 dec</code><p>Scheduled date<small>Plain words. When you plan to do it.</small></p></div>
+        <div><code>by fri<br>before 12 dec</code><p>Deadline<small>Plain words. When it must be done. Replaces <code>{fri}</code>.</small></p></div>
+        <div><code>at 3pm</code><p>Time<small>Implies today if no date is given.</small></p></div>
+        <div><code>!1 … !4 · p1</code><p>Priority<small><code>p1</code> still works for Todoist habits.</small></p></div>
+        <div><code>#home</code><p>Project<small>Accessory key on mobile, autocomplete after one letter.</small></p></div>
+        <div><code>@call</code><p>Label</p></div>
+        <div><code>energy:low</code><p>Custom field<small>Any field you define. Autocompletes names and values.</small></p></div>
+        <div><code>"stop by fri's"</code><p>Literal<small>Quotes stop parsing; the text stays in the title.</small></p></div>
+      </div>
+      <p class="fineprint">The parser forgives autocorrect: any case, curly quotes, "Tomorrow" capitalized by iOS, "tmr".</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ BOARD ═══════════════ -->
+<section id="board">
   <div class="sec-head">
     <div>
       <div class="eyebrow">Web &amp; desktop · interactive</div>
-      <h2>Board of filter lanes</h2>
-      <p>Type in the quick-add bar and watch it parse. Click a lane's query to rewrite it. Flip cascade to see overlap. Press <kbd>q</kbd> to jump to capture.</p>
+      <h2>The calm board</h2>
+      <p>Type in quick add (<kbd>q</kbd> jumps there), drag a card to another lane, hover a lane and open its menu, or use the sliders icon for view settings.</p>
     </div>
-    <span data-fb="d-overall"></span>
+    <span data-fb="r2-board" data-fb-label="The calm board overall"></span>
   </div>
 
-  <div class="device">
-    <div class="chrome"><i></i><i></i><i></i><span class="url">sift.app/home/board</span></div>
+  <div class="device" id="device">
+    <div class="chrome"><i></i><i></i><i></i><span class="url">dolist.app/horizons</span></div>
     <div class="app">
       <aside class="side">
         <div>
@@ -392,10 +492,9 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
         </div>
         <div>
           <h4>Views</h4>
-          <a class="on"><svg class="icon"><use href="#i-cols"/></svg>Horizons <span class="n">board</span></a>
-          <a><svg class="icon"><use href="#i-list"/></svg>Today <span class="n">list</span></a>
-          <a><svg class="icon"><use href="#i-flag"/></svg>Deadlines <span class="n">list</span></a>
-          <a><svg class="icon"><use href="#i-cal"/></svg>Week plan <span class="n">cal</span></a>
+          <a class="on"><svg class="icon"><use href="#i-cols"/></svg>Horizons</a>
+          <a><svg class="icon"><use href="#i-list"/></svg>Today</a>
+          <a><svg class="icon"><use href="#i-flag"/></svg>Deadlines</a>
         </div>
         <div>
           <h4>Projects</h4>
@@ -404,64 +503,39 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
           <a><i class="dot" style="background:var(--p2)"></i>admin</a>
           <a><i class="dot" style="background:var(--ok)"></i>health</a>
         </div>
-        <div><span data-fb="d-sidebar"></span></div>
       </aside>
 
       <div class="main">
         <div class="toolbar">
           <h3>Horizons</h3>
-          <span class="muted" style="font-size:.85rem">all projects</span>
-          <span class="grow"></span>
-          <div class="seg" role="group" aria-label="Renderer"><button class="on">Board</button><button>List</button><button>Calendar</button></div>
+          <button class="iconbtn" id="viewBtn" aria-label="View settings" aria-expanded="false"><svg class="icon"><use href="#i-sliders"/></svg></button>
         </div>
 
-        <div class="qa" id="qa">
+        <div class="qa">
           <div class="qa-line">
-            <svg class="icon" style="color:var(--muted)"><use href="#i-plus"/></svg>
+            <svg class="icon" style="color:var(--faint)"><use href="#i-plus"/></svg>
             <div class="qa-field">
               <div class="hl" id="qaHl" aria-hidden="true"></div>
-              <input id="qaIn" autocomplete="off" spellcheck="false" placeholder="Add task… try: Renew car insurance #admin @call p1 tomorrow at 9 {fri}" aria-label="Quick add task">
+              <input id="qaIn" autocomplete="off" spellcheck="false" placeholder="Add a task" aria-label="Add a task">
             </div>
-            <span data-fb="d-quickadd"></span>
+            <button class="iconbtn" id="helpBtn" aria-label="Shorthand cheatsheet" aria-expanded="false"><svg class="icon"><use href="#i-maybe"/></svg></button>
           </div>
-          <div class="chips" id="qaChips"></div>
-          <div class="qa-help">
-            <span><code>#project</code></span><span><code>@label</code></span><span><code>p1–p4</code></span>
-            <span><code>tomorrow · fri · in 3 days · 12 dec</code> scheduled</span>
-            <span><code>at 3pm</code> time</span><span><code>{next fri}</code> deadline</span>
-            <span><kbd>Enter</kbd> add</span>
-          </div>
+          <div class="qa-chips" id="qaChips" hidden></div>
         </div>
 
-        <div class="boardbar">
-          <label class="switch"><input type="checkbox" id="cascade" checked> Cascade lanes (first match wins)</label>
-          <span data-fb="d-cascade"></span>
-          <span class="grow" style="flex:1"></span>
-          <span class="muted">Click a query to edit · <span data-fb="d-queries"></span></span>
-        </div>
-
-        <div class="board" id="board"></div>
+        <pre class="recipe" id="recipe" hidden></pre>
+        <div class="board" id="boardEl"></div>
       </div>
     </div>
   </div>
 
-  <div class="under">
-    <div class="panel">
-      <div class="pinrow"><h3>Filter grammar (draft)</h3><span data-fb="d-grammar"></span></div>
-      <table class="grammar">
-        <tr><td>date:today</td><td>Scheduled <i>or</i> deadline on or before today (overdue included)</td></tr>
-        <tr><td>due:7d · deadline:30d</td><td>Rolling window from today. <span class="mono">due</span> = scheduled date only</td></tr>
-        <tr><td>date:week · month · quarter</td><td>Calendar period, until its end</td></tr>
-        <tr><td>overdue · due:none</td><td>Past dates · no scheduled date</td></tr>
-        <tr><td>#home · @call · p1</td><td>Project, label, priority</td></tr>
-        <tr><td>&amp;  |  !  ( )</td><td>And, or, not, grouping. Juxtaposition = and</td></tr>
-      </table>
-    </div>
-    <div class="panel">
-      <div class="pinrow"><h3>This view as a recipe</h3><span data-fb="d-recipe"></span></div>
-      <p class="muted" style="font-size:.88rem">Live. Copy it, paste it into someone else's Sift, or keep it in git.</p>
-      <pre id="recipe"></pre>
-    </div>
+  <div class="under-note">
+    <span>Quick add <span data-fb="r2-qa" data-fb-label="Calm quick add"></span></span>
+    <span>"?" cheatsheet <span data-fb="r2-cheat" data-fb-label="Cheatsheet behind ?"></span></span>
+    <span>Lane editor <span data-fb="r2-lane-editor" data-fb-label="Lane editor: Simple + Text"></span></span>
+    <span>Drag rewrites date <span data-fb="r2-drag" data-fb-label="Drag rewrites date"></span></span>
+    <span>View settings <span data-fb="r2-viewsettings" data-fb-label="View settings menu"></span></span>
+    <span>Compact rows <span data-fb="r2-density" data-fb-label="Compact density"></span></span>
   </div>
 </section>
 
@@ -470,10 +544,9 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
   <div class="sec-head">
     <div>
       <div class="eyebrow">iOS &amp; Android</div>
-      <h2>Capture first, lanes second</h2>
-      <p>The phone's job is getting things into the Inbox fast, then glancing at horizons. The lane view below runs the same recipe as the desktop board.</p>
+      <h2>Thumb-first capture</h2>
+      <p>The capture-bar widget is gone. The 1×1 add button and the lane widget stay. The capture sheet gains an accessory row for the tokens that cost the most taps.</p>
     </div>
-    <span data-fb="m-overall"></span>
   </div>
 
   <div class="phones">
@@ -482,18 +555,14 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
         <div class="notch"></div>
         <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
         <div class="home">
-          <div class="widget w-4x1"><svg class="icon" style="color:var(--accent-strong)"><use href="#i-plus"/></svg><span class="fake-in">Add to Inbox…</span><span class="mic"><svg class="icon"><use href="#i-mic"/></svg></span></div>
-          <div class="widget w-2x2" id="wToday"><h5><span>Today</span><span id="wTodayN"></span></h5></div>
           <div class="widget w-1x1"><svg class="icon lg"><use href="#i-plus"/></svg></div>
-          <div class="appicon"></div>
-          <div class="widget w-1x1" style="background:var(--surface);color:var(--accent-strong)"><svg class="icon lg"><use href="#i-mic"/></svg></div>
-          <div class="appicon"></div>
-          <div class="wlbl">Add</div><div class="wlbl"></div><div class="wlbl">Voice</div><div class="wlbl"></div>
+          <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
+          <div class="widget w-4x2" id="wToday"></div>
+          <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
           <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
         </div>
       </div>
-      <div class="phone-cap"><h3>Home screen widgets</h3><p>Capture bar (4×1), one-tap add and voice (1×1), a live lane (2×2). Lane widgets take any recipe.</p>
-        <div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center"><span class="muted" style="font-size:.8rem">bar</span><span data-fb="m-w-bar"></span><span class="muted" style="font-size:.8rem">1×1</span><span data-fb="m-w-1x1"></span><span class="muted" style="font-size:.8rem">lane</span><span data-fb="m-w-lane"></span></div></div>
+      <div class="phone-cap"><h3>Widgets</h3><p>1×1 opens the capture sheet instantly. The lane widget shows any lane from any view; tap a circle to complete.</p><span data-fb="r2-widgets" data-fb-label="Widgets (1×1 + lane)"></span></div>
     </div>
 
     <div class="phone-wrap">
@@ -503,25 +572,24 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
         <div class="sheet-bg">
           <div class="sheet">
             <div class="grab"></div>
-            <div class="eyebrow">Add to Inbox</div>
             <div class="typed hl" id="mTyped"></div>
             <div class="chips" id="mChips"></div>
-            <div class="acts">
-              <svg class="icon"><use href="#i-hash"/></svg><svg class="icon"><use href="#i-at"/></svg><svg class="icon"><use href="#i-cal"/></svg><svg class="icon"><use href="#i-flag"/></svg>
+            <div class="accessory" aria-label="Accessory row">
+              <span>#</span><span>@</span><span>!</span><span>by</span><span><svg class="icon"><use href="#i-cal"/></svg></span>
               <span class="send"><svg class="icon"><use href="#i-send"/></svg></span>
             </div>
           </div>
           <div class="kbd"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="m"></i><i class="w"></i><i class="m"></i></div>
         </div>
       </div>
-      <div class="phone-cap"><h3>Capture sheet</h3><p>Opens from a widget, share sheet or notification. Same live parsing. Toolbar inserts tokens for thumbs that don't want to type #.</p><span data-fb="m-sheet"></span></div>
+      <div class="phone-cap"><h3>Accessory row</h3><p><code>#</code> costs 3 taps on iOS, so it gets a key. <code>by</code> inserts "by " and suggests dates. The calendar key is a picker for people who'd rather not type dates.</p><span data-fb="r2-accessory" data-fb-label="Accessory row"></span></div>
     </div>
 
     <div class="phone-wrap">
       <div class="phone">
         <div class="notch"></div>
         <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
-        <div class="m-head"><h4>Horizons</h4><svg class="icon lg" style="color:var(--muted)"><use href="#i-filter"/></svg></div>
+        <div class="m-head"><h4>Horizons</h4><svg class="icon lg" style="color:var(--muted)"><use href="#i-sliders"/></svg></div>
         <div class="m-lanes" id="mLanes"></div>
         <div class="m-list" id="mList"></div>
         <span class="fab"><svg class="icon lg"><use href="#i-plus"/></svg></span>
@@ -532,46 +600,21 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
           <span><svg class="icon lg"><use href="#i-list"/></svg></span>
         </div>
       </div>
-      <div class="phone-cap"><h3>Lanes on a phone</h3><p>Board columns become a lane switcher with counts. Tap a lane. A swipe could move a task to the next horizon.</p><span data-fb="m-lanes"></span></div>
+      <div class="phone-cap"><h3>Swipe to the next horizon</h3><p>The phone version of dragging. Swipe left pushes a task to the next lane with the same date rule as desktop. Swipe right completes it.</p><span data-fb="r2-swipe" data-fb-label="Swipe to next horizon"></span></div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════ STYLES ═══════════════ -->
-<section id="styles">
+<!-- ═══════════════ OPTIONS ═══════════════ -->
+<section id="options">
   <div class="sec-head">
     <div>
-      <div class="eyebrow">Visual direction</div>
-      <h2>Two looks, same bones</h2>
-      <p>Switch them live with Calm / Ledger in the top bar; the whole page re-skins. Light and dark follow your system, with the moon button as override.</p>
+      <div class="eyebrow">Round 2 decisions</div>
+      <h2>Options</h2>
+      <p>Mark each choice. The outlined card is my recommendation, and the board above already behaves that way.</p>
     </div>
   </div>
-  <div class="looks">
-    <div class="look">
-      <div class="pinrow"><h3>Calm</h3><span data-fb="s-calm"></span></div>
-      <div class="swatches"><i style="background:#fafbfc"></i><i style="background:#ffffff"></i><i style="background:#7ec0d0"></i><i style="background:#376675"></i><i style="background:#002b36"></i><i style="background:#e07c5a"></i></div>
-      <p class="spec">Soft cards, rounded checks, Montserrat headings, Nunito body. Solarized-blue dark mode. Generous rows. For a daily review with coffee.</p>
-      <div class="demo" data-look="calm" id="demoCalm"></div>
-    </div>
-    <div class="look">
-      <div class="pinrow"><h3>Ledger</h3><span data-fb="s-ledger"></span></div>
-      <div class="swatches"><i style="background:#fafbfc"></i><i style="background:#f1f4f6"></i><i style="background:#376675"></i><i style="background:#1a1a2e"></i><i style="background:#d0603e"></i></div>
-      <p class="spec">Square edges, one-line rows, monospace metadata, no shadows. About 40% more tasks per screen. For keyboard-heavy triage.</p>
-      <div class="demo" data-look="ledger" id="demoLedger"></div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ FEATURES ═══════════════ -->
-<section id="features">
-  <div class="sec-head">
-    <div>
-      <div class="eyebrow">Brainstorm</div>
-      <h2>Feature menu</h2>
-      <p>Mark each one want, maybe or nope. Add notes in the marks panel at the bottom right. I read these back and we take it from there.</p>
-    </div>
-  </div>
-  <div class="feat-groups" id="feats"></div>
+  <div class="opts" id="opts"></div>
 </section>
 
 </main>
@@ -584,11 +627,11 @@ kbd { font: 500 .72rem var(--font-mono); padding: .05rem .35rem; border: 1px sol
    Dates
    ════════════════════════════════════════════════════════════ */
 
-const DAY   = 864e5
-const T     = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })()
-const addD  = n => new Date(T.getTime() + n * DAY)
-const WD    = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
-const MON   = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+const DAY  = 864e5
+const T    = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })()
+const addD = n => new Date(T.getTime() + n * DAY)
+const WD   = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+const MON  = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 
 // Calendar period ends (ISO week: Mon–Sun)
 const END = {
@@ -607,9 +650,9 @@ const fmt = d => {
   return d.toLocaleDateString("en", { day: "numeric", month: "short" })
 }
 
-// Natural-ish date phrase → Date (or null)
+// Date phrase → Date (or null). Forgiving: any case, "tmr", leading on/by/before
 function parseDate(s) {
-  s = s.trim().toLowerCase().replace(/^(on|by|due)\s+/, "")
+  s = s.trim().toLowerCase().replace(/^(on|by|before)\s+/, "")
   if (/^(today|tod)$/.test(s))        return T
   if (/^(tomorrow|tmr|tom)$/.test(s)) return addD(1)
 
@@ -623,7 +666,7 @@ function parseDate(s) {
 
   if ((m = s.match(/^(next )?(mon|tue|wed|thu|fri|sat|sun)[a-z]*$/))) {
     let diff = (WD.indexOf(m[2]) - T.getDay() + 7) % 7 || 7
-    if (m[1]) diff += diff < 7 ? 7 : 0
+    if (m[1] && diff < 7) diff += 7
     return addD(diff)
   }
   if ((m = s.match(/^(\d{1,2}) (jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*$/))) {
@@ -635,68 +678,70 @@ function parseDate(s) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   Quick-add parser — returns task fields + highlight spans
+   Quick-add parser — words first, cheap prefixes second
    ════════════════════════════════════════════════════════════ */
 
-const DATE_RX = String.raw`(?:on |by )?(?:today|tod|tomorrow|tmr|in \d+ (?:days?|d|weeks?|w|months?)|next (?:week|month)|(?:next )?(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d{1,2} (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)`
+const DATE = String.raw`(?:today|tod|tomorrow|tmr|in \d+ (?:days?|d|weeks?|w|months?)|next (?:week|month)|(?:next )?(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d{1,2} (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)`
+const B = String.raw`(?<=^|\s)`, E = String.raw`(?=$|\s)`
 
+// Order matters: earlier rules claim text first
 const RULES = [
-  { kind: "deadline", rx: /\{([^}]+)\}/gi,                          apply: (t, m) => (t.deadline = parseDate(m[1])) },
-  { kind: "proj",     rx: /(?<=^|\s)#([\w-]+)/gi,                    apply: (t, m) => (t.project = m[1].toLowerCase()) },
-  { kind: "label",    rx: /(?<=^|\s)@([\w-]+)/gi,                    apply: (t, m) => t.labels.push(m[1].toLowerCase()) },
-  { kind: "prio",     rx: /(?<=^|\s)p([1-4])\b/gi,                   apply: (t, m) => (t.p = +m[1]) },
-  { kind: "time",     rx: /\bat (\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/gi, apply: (t, m) => {
+  { kind: "literal",  rx: /["“”]([^"“”]*)["“”]/g,                                 apply: () => {} },
+  { kind: "deadline", rx: new RegExp(`${B}(?:by|before) ${DATE}${E}`, "gi"),       apply: (t, m) => (t.deadline = parseDate(m[0])) },
+  { kind: "time",     rx: new RegExp(`${B}at (\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?${E}`, "gi"), apply: (t, m) => {
       let h = +m[1]; if (m[3]?.toLowerCase() === "pm" && h < 12) h += 12
       t.time = `${String(h).padStart(2, "0")}:${m[2] || "00"}`
     } },
-  { kind: "due",      rx: new RegExp(String.raw`(?<=^|\s)${DATE_RX}(?=$|\s)`, "gi"), apply: (t, m) => (t.due = parseDate(m[0])) },
+  { kind: "due",      rx: new RegExp(`${B}(?:on )?${DATE}${E}`, "gi"),             apply: (t, m) => (t.due = parseDate(m[0])) },
+  { kind: "prio",     rx: new RegExp(`${B}[!p]([1-4])${E}`, "gi"),                 apply: (t, m) => (t.p = +m[1]) },
+  { kind: "proj",     rx: new RegExp(`${B}#([\\w-]+)`, "gi"),                      apply: (t, m) => (t.project = m[1].toLowerCase()) },
+  { kind: "label",    rx: new RegExp(`${B}@([\\w-]+)`, "gi"),                      apply: (t, m) => t.labels.push(m[1].toLowerCase()) },
+  { kind: "field",    rx: new RegExp(`${B}([a-z]+):([\\w-]+)${E}`, "gi"),          apply: (t, m) => (t.fields[m[1].toLowerCase()] = m[2].toLowerCase()) },
 ]
 
 function parseCapture(text) {
-  const task  = { title: "", project: null, labels: [], p: 4, due: null, time: null, deadline: null }
+  const task  = { title: "", project: null, labels: [], fields: {}, p: 4, due: null, time: null, deadline: null }
   const spans = []
-  const taken = i => spans.some(s => i >= s.from && i < s.to)
+  const free  = (a, b) => !spans.some(s => a < s.to && b > s.from)
 
   for (const rule of RULES) {
     for (const m of text.matchAll(rule.rx)) {
-      if (taken(m.index)) continue
+      const to = m.index + m[0].length
+      if (!free(m.index, to)) continue
       rule.apply(task, m)
-      spans.push({ from: m.index, to: m.index + m[0].length, kind: rule.kind })
+      spans.push({ from: m.index, to, kind: rule.kind, inner: m[1] })
     }
   }
-
-  // Time without a date implies today
   if (task.time && !task.due) task.due = T
 
+  // Title = text minus recognized tokens; literals keep their inner text
   spans.sort((a, b) => a.from - b.from)
   let title = "", i = 0
-  for (const s of spans) { title += text.slice(i, s.from); i = s.to }
+  for (const s of spans) { title += text.slice(i, s.from) + (s.kind === "literal" ? s.inner : ""); i = s.to }
   task.title = (title + text.slice(i)).replace(/\s+/g, " ").trim()
 
-  return { task, spans }
+  return { task, spans: spans.filter(s => s.kind !== "literal") }
 }
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
 
 const highlight = (text, spans) => {
   let out = "", i = 0
-  for (const s of spans) {
-    out += esc(text.slice(i, s.from)) + `<mark class="k-${s.kind}">${esc(text.slice(s.from, s.to))}</mark>`
-    i = s.to
-  }
+  for (const s of spans) { out += esc(text.slice(i, s.from)) + `<mark>${esc(text.slice(s.from, s.to))}</mark>`; i = s.to }
   return out + esc(text.slice(i))
 }
 
 /* ════════════════════════════════════════════════════════════
-   Filter language — tiny recursive-descent → predicate
+   Filter language — tiny recursive descent → predicate
    ════════════════════════════════════════════════════════════ */
 
 function compileFilter(src) {
-  const toks = src.match(/\(|\)|&|\||!|[^\s()&|!]+/g) || []
+  // "!" before 1–4 is priority (!1), otherwise negation
+  const toks = src.match(/\(|\)|&|\||![1-4](?=$|[\s)])|!|[^\s()&|!]+/g) || []
   let i = 0
   const peek = () => toks[i], next = () => toks[i++]
 
-  const orE = () => { let l = andE(); while (peek() === "|") { next(); const r = andE(), a = l; l = t => a(t) || r(t) } return l }
+  const orE  = () => { let l = andE(); while (peek() === "|") { next(); const r = andE(), a = l; l = t => a(t) || r(t) } return l }
   const andE = () => {
     let l = notE()
     while (peek() && peek() !== ")" && peek() !== "|") {
@@ -708,8 +753,8 @@ function compileFilter(src) {
   const notE = () => { if (peek() === "!") { next(); const e = notE(); return t => !e(t) } return atom() }
   const atom = () => {
     const tok = next()
-    if (tok === undefined) throw Error("Query ends early")
-    if (tok === "(") { const e = orE(); if (next() !== ")") throw Error("Missing )"); return e }
+    if (tok === undefined) throw Error("The query ends too early")
+    if (tok === "(") { const e = orE(); if (next() !== ")") throw Error("A ( is never closed"); return e }
     return term(tok.toLowerCase())
   }
 
@@ -717,195 +762,346 @@ function compileFilter(src) {
     if (END[v]) return END[v]
     const m = v.match(/^(\d+)d$/)
     if (m) return addD(+m[1] - 1)
-    throw Error(`Unknown period "${v}"; try today, 7d, week, month, quarter`)
+    throw Error(`"${v}" isn't a period. Use today, 7d, week, month or quarter`)
   }
 
   function term(tok) {
     if (tok === "overdue") return t => (t.due && t.due < T) || (t.deadline && t.deadline < T)
-    if (tok === "done")    return t => t.done
-    if (/^p[1-4]$/.test(tok)) return t => t.p === +tok[1]
-    if (tok[0] === "#")    return t => t.project === tok.slice(1)
-    if (tok[0] === "@")    return t => t.labels.includes(tok.slice(1))
+    if (/^[!p][1-4]$/.test(tok)) return t => t.p === +tok[1]
+    if (tok[0] === "#") return t => t.project === tok.slice(1)
+    if (tok[0] === "@") return t => t.labels.includes(tok.slice(1))
 
-    const m = tok.match(/^(due|deadline|date):(.+)$/)
-    if (!m) throw Error(`Unknown term "${tok}"`)
+    const m = tok.match(/^([a-z]+):(.+)$/)
+    if (!m) throw Error(`"${tok}" isn't something I can filter on`)
     const [, field, v] = m
+    if (!["due", "deadline", "date"].includes(field)) return t => t.fields?.[field] === v   // custom field
+
     if (v === "none") return field === "deadline" ? t => !t.deadline : field === "due" ? t => !t.due : t => !t.due && !t.deadline
-    const end = horizon(v)
-    const inD = d => d && d <= end
+    const end = horizon(v), inD = d => !!d && d <= end
     return field === "due" ? t => inD(t.due) : field === "deadline" ? t => inD(t.deadline) : t => inD(t.due) || inD(t.deadline)
   }
 
   const fn = orE()
-  if (i < toks.length) throw Error(`Unexpected "${toks[i]}"`)
+  if (i < toks.length) throw Error(`Didn't expect "${toks[i]}" here`)
   return fn
 }
 
 /* ════════════════════════════════════════════════════════════
-   Sample data (relative to today) + view state
+   Sample data + view
    ════════════════════════════════════════════════════════════ */
 
 let uid = 0
-const mk = (title, project, p, { due, time, dl, labels = [] } = {}) => ({
-  id: ++uid, title, project, p, labels, time: time || null,
+const mk = (title, project, p, { due, time, dl, labels = [], fields = {} } = {}) => ({
+  id: ++uid, title, project, p, labels, fields, time: time || null,
   due: due == null ? null : addD(due), deadline: dl == null ? null : addD(dl), done: false,
 })
 
 const tasks = [
-  mk("Review onboarding PR",            "work",   2, { due: -1, labels: ["deep"] }),
-  mk("Draft Q1 roadmap",                "work",   1, { due: 0, time: "10:00", dl: 9, labels: ["deep"] }),
-  mk("Call plumber about the boiler",   "home",   2, { due: 0, labels: ["call"] }),
-  mk("Renew passport",                  "admin",  1, { due: 1, dl: 5, labels: ["errand"] }),
-  mk("Cancel unused subscriptions",     "admin",  3, { due: 2 }),
-  mk("Book dentist check-up",           "health", 3, { due: 3, labels: ["call"] }),
-  mk("Prepare workshop slides",         "work",   1, { due: 4, time: "14:00", dl: 4 }),
-  mk("Write newsletter draft",          "work",   2, { due: 6, labels: ["deep"] }),
-  mk("Order birthday gift for Sam",     "home",   2, { dl: 8, labels: ["errand"] }),
-  mk("Plan winter trip",                "home",   4, { due: 12 }),
-  mk("Pay quarterly VAT",               "admin",  1, { dl: 20 }),
-  mk("Replace bike chain",              "home",   4, { due: 25, labels: ["errand"] }),
-  mk("Annual review self-assessment",   "work",   2, { dl: 34 }),
-  mk("Physio exercises routine",        "health", 3, { due: 0, labels: ["habit"] }),
-  mk("Send tax documents to accountant","admin",  1, { dl: 60 }),
-  mk("Clean up photo library",          "home",   4, {}),
+  mk("Review onboarding PR",             "work",   2, { due: -1, labels: ["deep"] }),
+  mk("Draft Q1 roadmap",                 "work",   1, { due: 0, time: "10:00", dl: 9, labels: ["deep"], fields: { energy: "high" } }),
+  mk("Call plumber about the boiler",    "home",   2, { due: 0, labels: ["call"], fields: { energy: "low" } }),
+  mk("Physio exercises",                 "health", 3, { due: 0 }),
+  mk("Renew passport",                   "admin",  1, { due: 1, dl: 5, labels: ["errand"] }),
+  mk("Cancel unused subscriptions",      "admin",  3, { due: 2, fields: { energy: "low" } }),
+  mk("Book dentist check-up",            "health", 3, { due: 3, labels: ["call"] }),
+  mk("Prepare workshop slides",          "work",   1, { due: 4, time: "14:00", dl: 4 }),
+  mk("Write newsletter draft",           "work",   2, { due: 6, labels: ["deep"] }),
+  mk("Order birthday gift for Sam",      "home",   2, { dl: 8, labels: ["errand"] }),
+  mk("Plan winter trip",                 "home",   4, { due: 12 }),
+  mk("Pay quarterly VAT",                "admin",  1, { dl: 20 }),
+  mk("Replace bike chain",               "home",   4, { due: 25, labels: ["errand"] }),
+  mk("Annual review self-assessment",    "work",   2, { dl: 34 }),
+  mk("Send tax documents to accountant", "admin",  1, { dl: 60 }),
+  mk("Clean up photo library",           "home",   4, {}),
 ]
 
 const view = {
   name: "Horizons",
-  cascade: true,
+  once: true,                // "show each task once" = cascade
   lanes: [
-    { name: "Today",        query: "date:today",   sort: "priority" },
-    { name: "This week",    query: "date:7d",      sort: "date" },
-    { name: "This month",   query: "date:30d",   sort: "priority" },
-    { name: "This quarter", query: "date:90d", sort: "deadline" },
+    { name: "Today",        query: "date:today", sort: "priority" },
+    { name: "Next 7 days",  query: "date:7d",    sort: "date" },
+    { name: "Next 30 days", query: "date:30d",   sort: "priority" },
+    { name: "Next 90 days", query: "date:90d",   sort: "deadline" },
   ],
 }
 
+const firstDate = t => Math.min(t.due ?? Infinity, t.deadline ?? Infinity)
 const SORTS = {
   priority: (a, b) => a.p - b.p || firstDate(a) - firstDate(b),
   date:     (a, b) => firstDate(a) - firstDate(b) || a.p - b.p,
   deadline: (a, b) => (a.deadline ?? Infinity) - (b.deadline ?? Infinity) || a.p - b.p,
 }
-const firstDate = t => Math.min(t.due ?? Infinity, t.deadline ?? Infinity)
 
-// Distribute open tasks into lanes; cascade = first matching lane only
+const compiled = () => view.lanes.map(l => { try { return { fn: compileFilter(l.query) } } catch (e) { return { fn: () => false, error: e.message } } })
+
+// First lane a task fits, or -1
+const laneOf = (task, fns = compiled()) => fns.findIndex(c => c.fn(task))
+
 function distribute() {
-  const seen = new Set()
-  return view.lanes.map(lane => {
-    let fn, error = null
-    try { fn = compileFilter(lane.query) } catch (e) { error = e.message; fn = () => false }
+  const fns = compiled(), seen = new Set()
+  return view.lanes.map((lane, i) => {
     const items = tasks
-      .filter(t => !t.done && !(view.cascade && seen.has(t.id)) && fn(t))
+      .filter(t => !t.done && !(view.once && seen.has(t.id)) && fns[i].fn(t))
       .sort(SORTS[lane.sort])
-    if (view.cascade) items.forEach(t => seen.add(t.id))
-    return { lane, items, error }
+    if (view.once) items.forEach(t => seen.add(t.id))
+    return { lane, items, error: fns[i].error }
   })
 }
 
 /* ════════════════════════════════════════════════════════════
-   Rendering
+   Board rendering
    ════════════════════════════════════════════════════════════ */
 
 const ico = id => `<svg class="icon"><use href="#i-${id}"/></svg>`
+const $ = id => document.getElementById(id)
 
-function metaChips(t) {
-  const c = []
-  if (t.due) {
-    const late = t.due < T
-    c.push(`<span class="chip due${late ? " overdue" : ""}">${ico("cal")}${fmt(t.due)}${t.time ? " " + t.time : ""}</span>`)
-  }
-  if (t.deadline) c.push(`<span class="chip deadline${t.deadline < T ? " overdue" : ""}">${ico("flag")}${fmt(t.deadline)}</span>`)
-  if (t.project)  c.push(`<span class="chip proj">#${esc(t.project)}</span>`)
-  t.labels.forEach(l => c.push(`<span class="chip label">@${esc(l)}</span>`))
-  return c.join("")
+function meta(t) {
+  const out = []
+  if (t.due)      out.push(`<span class="${t.due < T ? "late" : ""}">${ico("cal")}${fmt(t.due)}${t.time ? " " + t.time : ""}</span>`)
+  if (t.deadline) out.push(`<span class="dl${t.deadline < T ? " late" : ""}">${ico("flag")}${fmt(t.deadline)}</span>`)
+  if (t.project)  out.push(`<span class="lbl">#${esc(t.project)}</span>`)
+  t.labels.forEach(l => out.push(`<span class="lbl">@${esc(l)}</span>`))
+  return out.join("")
 }
 
-const card = t => `
-  <div class="card" data-id="${t.id}">
+const card = (t, drag = true) => `
+  <div class="card" data-id="${t.id}"${drag ? ' draggable="true"' : ""}>
     <button class="check p${t.p}" aria-label="Complete ${esc(t.title)}"></button>
     <div class="t">${esc(t.title)}</div>
-    <div class="meta">${metaChips(t)}</div>
+    <div class="meta">${meta(t)}</div>
   </div>`
 
-function renderBoard() {
+function render() {
   const cols = distribute()
-
-  document.getElementById("board").innerHTML = cols.map(({ lane, items, error }, i) => `
-    <div class="col">
+  $("boardEl").innerHTML = cols.map(({ lane, items, error }, i) => `
+    <div class="col" data-lane="${i}">
       <div class="col-head">
         <h3>${esc(lane.name)}</h3><span class="n">${items.length}</span>
-        <select data-sort="${i}" aria-label="Sort ${esc(lane.name)}">
-          ${Object.keys(SORTS).map(k => `<option value="${k}"${k === lane.sort ? " selected" : ""}>by ${k}</option>`).join("")}
-        </select>
+        ${error ? `<span class="warn" title="${esc(error)}">${ico("alert")}</span>` : ""}
+        <button class="iconbtn" data-edit="${i}" aria-label="Edit lane ${esc(lane.name)}" aria-expanded="false">${ico("dots")}</button>
       </div>
-      <label class="q${error ? " err" : ""}">${ico("filter")}<input data-q="${i}" value="${esc(lane.query)}" aria-label="Filter for ${esc(lane.name)}"></label>
-      ${error ? `<div class="q-err">${esc(error)}</div>` : ""}
-      ${items.map(card).join("") || `<div class="empty">Nothing matches</div>`}
-    </div>`).join("") + `<button class="addcol" id="addCol">${ico("plus")}&nbsp;Add lane</button>`
+      ${items.map(t => card(t)).join("") || `<div class="empty">Nothing here</div>`}
+    </div>`).join("")
 
-  document.getElementById("inboxCount").textContent = tasks.filter(t => !t.done && !t.due && !t.deadline).length
-  renderRecipe()
-  renderMobileLanes(cols)
-  renderWidget(cols[0])
-  renderDemos(cols[0])
+  $("inboxCount").textContent = tasks.filter(t => !t.done && !t.due && !t.deadline).length
+  if (!$("recipe").hidden) renderRecipe()
+  renderMobile(cols)
 }
 
 function renderRecipe() {
-  const lines = [
+  $("recipe").textContent = [
     `view "${view.name}" {`,
-    `  source:  all projects & !done`,
-    `  render:  board`,
-    `  cascade: ${view.cascade}`,
-    ...view.lanes.map(l => `  lane "${l.name}"`.padEnd(22) + `{ filter: ${l.query}  sort: ${l.sort} }`),
+    `  show:      board`,
+    `  each-once: ${view.once}`,
+    ...view.lanes.map(l => `  lane "${l.name}"`.padEnd(24) + `{ ${l.query}  sort ${l.sort} }`),
     `}`,
-  ]
-  document.getElementById("recipe").textContent = lines.join("\n")
+  ].join("\n")
 }
 
-// Board interactions (delegated)
-const board = document.getElementById("board")
-board.addEventListener("change", e => {
-  const s = e.target.dataset.sort
-  if (s != null) { view.lanes[s].sort = e.target.value; renderBoard() }
-})
-board.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.q != null) e.target.blur() })
-board.addEventListener("focusout", e => {
-  const q = e.target.dataset.q
-  if (q != null && view.lanes[q].query !== e.target.value) { view.lanes[q].query = e.target.value; renderBoard() }
-})
-board.addEventListener("click", e => {
-  if (e.target.closest("#addCol")) {
-    view.lanes.push({ name: "High priority", query: "p1 | p2 & date:7d", sort: "priority" })
-    renderBoard()
-    return
-  }
+/* ── popovers (one at a time) ───────────────────────────── */
+
+let pop = null
+function closePop() {
+  pop?.el.remove()
+  pop?.btn.setAttribute("aria-expanded", "false")
+  pop = null
+}
+function openPop(btn, html, onMount) {
+  const same = pop?.btn === btn
+  closePop()
+  if (same) return
+  const host = $("device"), el = document.createElement("div")
+  el.className = "pop"
+  el.innerHTML = html
+  host.appendChild(el)
+  const hb = host.getBoundingClientRect(), bb = btn.getBoundingClientRect()
+  el.style.top  = `${bb.bottom - hb.top + 6}px`
+  el.style.left = `${Math.max(8, Math.min(bb.right - hb.left - el.offsetWidth, hb.width - el.offsetWidth - 8))}px`
+  btn.setAttribute("aria-expanded", "true")
+  pop = { el, btn }
+  onMount?.(el)
+}
+document.addEventListener("click", e => { if (pop && pop.el.isConnected && !pop.el.contains(e.target) && !pop.btn.contains(e.target)) closePop() })
+document.addEventListener("keydown", e => { if (e.key === "Escape" && pop) { pop.btn.focus(); closePop() } })
+
+/* ── view settings ──────────────────────────────────────── */
+
+$("viewBtn").addEventListener("click", e => openPop(e.currentTarget, `
+  <h4>View settings</h4>
+  <label class="switchrow"><span>Show each task once<br><small class="muted">A task appears only in the first lane it fits</small></span><input type="checkbox" id="setOnce" ${view.once ? "checked" : ""}></label>
+  <label class="switchrow"><span>Compact rows</span><input type="checkbox" id="setDense" ${document.documentElement.dataset.density === "compact" ? "checked" : ""}></label>
+  <label class="switchrow"><span>Show view as text</span><input type="checkbox" id="setText" ${$("recipe").hidden ? "" : "checked"}></label>`,
+  el => {
+    el.querySelector("#setOnce").onchange  = ev => { view.once = ev.target.checked; render() }
+    el.querySelector("#setDense").onchange = ev => { document.documentElement.dataset.density = ev.target.checked ? "compact" : "" }
+    el.querySelector("#setText").onchange  = ev => { $("recipe").hidden = !ev.target.checked; renderRecipe() }
+  }))
+
+/* ── cheatsheet ─────────────────────────────────────────── */
+
+$("helpBtn").addEventListener("click", e => openPop(e.currentTarget, `
+  <h4>Shorthand</h4>
+  <table class="cheat">
+    <tr><td>tomorrow · fri · in 3 days</td><td>Scheduled</td></tr>
+    <tr><td>by fri · before 12 dec</td><td>Deadline</td></tr>
+    <tr><td>at 3pm</td><td>Time</td></tr>
+    <tr><td>!1 – !4</td><td>Priority</td></tr>
+    <tr><td>#home · @call</td><td>Project · label</td></tr>
+    <tr><td>energy:low</td><td>Custom field</td></tr>
+    <tr><td>"…"</td><td>Keep as plain text</td></tr>
+  </table>`))
+
+/* ── lane editor: Simple ⇄ Text ─────────────────────────── */
+
+const SIMPLE_RX = /^(date|due|deadline):(\w+)(?: #([\w-]+))?$/
+const WITHIN = [["today", "Today and overdue"], ["7d", "Next 7 days"], ["30d", "Next 30 days"], ["90d", "Next 90 days"], ["week", "This week"], ["month", "This month"], ["quarter", "This quarter"]]
+const WHICH  = [["date", "Scheduled date or deadline"], ["due", "Scheduled date"], ["deadline", "Deadline"]]
+const PROJS  = [["", "All projects"], ["home", "#home"], ["work", "#work"], ["admin", "#admin"], ["health", "#health"]]
+const SORTN  = [["priority", "Priority"], ["date", "Date"], ["deadline", "Deadline"]]
+const opts   = (list, cur) => list.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${l}</option>`).join("")
+
+function laneEditor(i, btn, tab) {
+  const lane = view.lanes[i], simple = lane.query.match(SIMPLE_RX)
+  tab ??= simple ? "simple" : "text"
+
+  const builder = simple ? `
+    <div class="field">Name<input class="q" style="font-family:var(--font-body)" id="lName" value="${esc(lane.name)}"></div>
+    <div class="field">Show tasks by<select id="lWhich">${opts(WHICH, simple[1])}</select></div>
+    <div class="field">Within<select id="lWithin">${opts(WITHIN, simple[2])}</select></div>
+    <div class="field">Project<select id="lProj">${opts(PROJS, simple[3] || "")}</select></div>` : `
+    <p class="note">This lane uses rules the Simple tab can't show. Edit them in Text.</p>`
+
+  let err = null
+  try { compileFilter(lane.query) } catch (e) { err = e.message }
+
+  const text = `
+    <div class="field">Query<input class="q${err ? " err" : ""}" id="lQuery" value="${esc(lane.query)}" spellcheck="false">
+      ${err ? `<div class="err-msg">${ico("alert")}${esc(err)}</div>` : ""}</div>
+    <p class="note">Combine with <code>&amp;</code> <code>|</code> <code>!</code> <code>( )</code>. Try <code>#work &amp; (!1 | deadline:7d)</code> or <code>energy:low</code>.</p>`
+
+  openPop(btn, `
+    <div class="tabs-mini"><button data-tab="simple" class="${tab === "simple" ? "on" : ""}">Simple</button><button data-tab="text" class="${tab === "text" ? "on" : ""}">Text</button></div>
+    ${tab === "simple" ? builder : text}
+    <div class="field">Sort by<select id="lSort">${opts(SORTN, lane.sort)}</select></div>`,
+    el => {
+      el.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { closePop(); laneEditor(i, btn, b.dataset.tab) })
+      const upd = () => {
+        if (el.querySelector("#lWhich")) {
+          const p = el.querySelector("#lProj").value
+          lane.query = `${el.querySelector("#lWhich").value}:${el.querySelector("#lWithin").value}${p ? " #" + p : ""}`
+          lane.name  = el.querySelector("#lName").value || lane.name
+        }
+        lane.sort = el.querySelector("#lSort").value
+        reopen(i, tab)
+      }
+      el.querySelectorAll("select").forEach(s => s.onchange = upd)
+      el.querySelector("#lName")?.addEventListener("change", upd)
+      const q = el.querySelector("#lQuery")
+      q?.addEventListener("change", () => { lane.query = q.value.trim(); reopen(i, "text") })
+      q?.addEventListener("keydown", ev => { if (ev.key === "Enter") q.dispatchEvent(new Event("change")) })
+    })
+}
+// Re-render, then re-open the same lane's editor on its fresh button
+function reopen(i, tab) {
+  closePop()
+  render()
+  laneEditor(i, document.querySelector(`[data-edit="${i}"]`), tab)
+}
+
+/* ── board events ───────────────────────────────────────── */
+
+const boardEl = $("boardEl")
+boardEl.addEventListener("click", e => {
+  const ed = e.target.closest("[data-edit]")
+  if (ed) return laneEditor(+ed.dataset.edit, ed)
   const chk = e.target.closest(".check")
   if (!chk) return
   const el = chk.closest(".card"), t = tasks.find(x => x.id === +el.dataset.id)
   t.done = true
   el.classList.add("done")
-  setTimeout(renderBoard, 320)
+  setTimeout(render, 320)
+  toast(`Completed "${t.title}"`, () => { t.done = false; render() })
 })
-document.getElementById("cascade").addEventListener("change", e => { view.cascade = e.target.checked; renderBoard() })
 
-/* ── quick add ───────────────────────────────────────────── */
+// Drag → earliest scheduled date that lands the task in the target lane
+let dragId = null
+boardEl.addEventListener("dragstart", e => {
+  const c = e.target.closest(".card"); if (!c) return
+  dragId = +c.dataset.id; c.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"
+})
+boardEl.addEventListener("dragend", e => {
+  e.target.closest(".card")?.classList.remove("dragging")
+  boardEl.querySelectorAll(".over").forEach(x => x.classList.remove("over"))
+})
+boardEl.addEventListener("dragover", e => {
+  const col = e.target.closest(".col"); if (!col || dragId == null) return
+  e.preventDefault()
+  boardEl.querySelectorAll(".over").forEach(x => x !== col && x.classList.remove("over"))
+  col.classList.add("over")
+})
+boardEl.addEventListener("drop", e => {
+  const col = e.target.closest(".col"); if (!col || dragId == null) return
+  e.preventDefault()
+  moveToLane(tasks.find(t => t.id === dragId), +col.dataset.lane)
+  dragId = null
+})
 
-const qaIn = document.getElementById("qaIn"), qaHl = document.getElementById("qaHl"), qaChips = document.getElementById("qaChips")
+function moveToLane(t, target) {
+  const fns = compiled()
+  if (laneOf(t, fns) === target) return render()
 
-function captureChips(task) {
+  // Deadline alone pins it to an earlier lane → rescheduling can't move it
+  const byDeadline = laneOf({ ...t, due: null }, fns)
+  if (byDeadline !== -1 && byDeadline < target) {
+    render()
+    return toast(`Its deadline (${fmt(t.deadline)}) keeps it in ${view.lanes[byDeadline].name}`)
+  }
+  for (let d = 0; d <= 400; d++) {
+    const cand = { ...t, due: addD(d) }
+    if (laneOf(cand, fns) === target) {
+      const before = t.due
+      t.due = cand.due
+      render()
+      return toast(`Scheduled for ${fmt(t.due)}`, () => { t.due = before; render() })
+    }
+  }
+  render()
+  toast(`No date fits ${view.lanes[target].name}. Edit the lane or the task.`)
+}
+
+let toastTimer
+function toast(msg, undo) {
+  document.querySelector(".toast")?.remove()
+  const el = document.createElement("div")
+  el.className = "toast"; el.setAttribute("role", "status")
+  el.innerHTML = `<span>${esc(msg)}</span>${undo ? "<button>Undo</button>" : ""}`
+  if (undo) el.querySelector("button").onclick = () => { undo(); el.remove() }
+  $("device").appendChild(el)
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el.remove(), 4000)
+}
+
+/* ── quick add ──────────────────────────────────────────── */
+
+const qaIn = $("qaIn"), qaHl = $("qaHl"), qaChips = $("qaChips")
+
+function chips(task) {
   const c = []
-  c.push(`<span class="chip proj">${ico("inbox")}${task.project ? "#" + esc(task.project) : "Inbox"}</span>`)
-  if (task.p < 4) c.push(`<span class="chip" style="color:var(--p${task.p})">${ico("flag")}P${task.p}</span>`)
-  if (task.due) c.push(`<span class="chip due">${ico("cal")}${fmt(task.due)}${task.time ? " " + task.time : ""}</span>`)
-  if (task.deadline) c.push(`<span class="chip deadline">${ico("flag")}deadline ${fmt(task.deadline)}</span>`)
-  task.labels.forEach(l => c.push(`<span class="chip label">@${esc(l)}</span>`))
+  if (task.project)  c.push(`<span class="chip">${ico("folder")}${esc(task.project)}</span>`)
+  if (task.due)      c.push(`<span class="chip">${ico("cal")}${fmt(task.due)}${task.time ? " " + task.time : ""}</span>`)
+  if (task.deadline) c.push(`<span class="chip deadline">${ico("flag")}by ${fmt(task.deadline)}</span>`)
+  if (task.p < 4)    c.push(`<span class="chip prio${task.p}">${ico("target")}Priority ${task.p}</span>`)
+  task.labels.forEach(l => c.push(`<span class="chip">${ico("tag")}${esc(l)}</span>`))
+  Object.entries(task.fields).forEach(([k, v]) => c.push(`<span class="chip">${esc(k)}: ${esc(v)}</span>`))
   return c.join("")
 }
 
 function syncQA() {
   const { task, spans } = parseCapture(qaIn.value)
   qaHl.innerHTML = highlight(qaIn.value, spans)
-  qaChips.innerHTML = qaIn.value.trim() ? captureChips(task) : ""
+  qaChips.innerHTML = chips(task)
+  qaChips.hidden = !spans.length               // recognition appears only once something is recognized
   qaHl.scrollLeft = qaIn.scrollLeft
 }
 qaIn.addEventListener("input", syncQA)
@@ -915,15 +1111,17 @@ qaIn.addEventListener("keydown", e => {
   if (e.key !== "Enter") return
   const { task } = parseCapture(qaIn.value)
   if (!task.title) return
-  tasks.push({ ...task, id: ++uid, done: false })
+  const t = { ...task, id: ++uid, done: false }
+  tasks.push(t)
   qaIn.value = ""
-  syncQA()
-  renderBoard()
+  syncQA(); render()
+  const where = laneOf(t)
+  toast(where === -1 ? `Added to ${t.project ? "#" + t.project : "Inbox"}` : `Added to ${view.lanes[where].name}`)
 })
 document.addEventListener("keydown", e => {
   if (e.key === "q" && !e.target.closest("input, textarea, select")) {
     e.preventDefault()
-    document.getElementById("desktop").scrollIntoView({ behavior: "smooth", block: "start" })
+    $("board").scrollIntoView({ behavior: "smooth", block: "start" })
     qaIn.focus({ preventScroll: true })
   }
 })
@@ -931,138 +1129,120 @@ document.addEventListener("keydown", e => {
 /* ── mobile ─────────────────────────────────────────────── */
 
 let mLane = 0
-function renderMobileLanes(cols) {
-  document.getElementById("mLanes").innerHTML = cols.map((c, i) =>
-    `<button data-ml="${i}" class="${i === mLane ? "on" : ""}">${esc(c.lane.name)}<b>${c.items.length}</b></button>`).join("")
-  const cur = cols[mLane] || cols[0]
-  document.getElementById("mList").innerHTML = cur.items.map(card).join("") || `<div class="empty">Nothing matches</div>`
-}
-document.getElementById("mLanes").addEventListener("click", e => {
-  const b = e.target.closest("[data-ml]")
-  if (b) { mLane = +b.dataset.ml; renderBoard() }
-})
+function renderMobile(cols) {
+  $("mLanes").innerHTML = cols.map((c, i) => `<button data-ml="${i}" class="${i === mLane ? "on" : ""}">${esc(c.lane.name)}<b>${c.items.length}</b></button>`).join("")
+  const items = (cols[mLane] || cols[0]).items
+  $("mList").innerHTML = items.map((t, i) => i === 0
+    ? `<div class="swipe-hint"><div class="under">${ico("arrow")}${esc(cols[mLane + 1]?.lane.name || "Later")}</div>${card(t, false)}</div>`
+    : card(t, false)).join("") || `<div class="empty">Nothing here</div>`
 
-function renderWidget(col) {
-  const w = document.getElementById("wToday")
-  w.innerHTML = `<h5><span>${esc(col.lane.name)}</span><span>${col.items.length}</span></h5>` +
-    col.items.slice(0, 5).map(t => `<div class="wrow"><span class="check p${t.p}"></span><span>${esc(t.title)}</span></div>`).join("")
+  const w = cols[0]
+  $("wToday").innerHTML = `<h5><span>${esc(w.lane.name)}</span><span>${w.items.length}</span></h5>` +
+    w.items.slice(0, 5).map(t => `<div class="wrow"><span class="check p${t.p}"></span><span>${esc(t.title)}</span></div>`).join("")
 }
+$("mLanes").addEventListener("click", e => { const b = e.target.closest("[data-ml]"); if (b) { mLane = +b.dataset.ml; render() } })
 
-// Animated typing demo in the capture sheet
-const DEMO_TEXT = "Pick up dry cleaning @errand tomorrow at 5pm p2"
-const mTyped = document.getElementById("mTyped"), mChips = document.getElementById("mChips")
+// Typing demo in the capture sheet
+const DEMO = "Call mum about dinner #home by fri !2"
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
 function typeStep(n) {
-  const s = DEMO_TEXT.slice(0, n), { task, spans } = parseCapture(s)
-  mTyped.innerHTML = highlight(s, spans) + (n < DEMO_TEXT.length ? '<span style="color:var(--accent-strong)">|</span>' : "")
-  mChips.innerHTML = captureChips(task)
+  const s = DEMO.slice(0, n), { task, spans } = parseCapture(s)
+  $("mTyped").innerHTML = highlight(s, spans) + (n < DEMO.length ? '<span style="color:var(--accent-strong)">|</span>' : "")
+  $("mChips").innerHTML = chips(task)
   if (reduced) return
-  setTimeout(() => typeStep(n >= DEMO_TEXT.length ? 0 : n + 1), n >= DEMO_TEXT.length ? 2600 : 70)
+  setTimeout(() => typeStep(n >= DEMO.length ? 0 : n + 1), n >= DEMO.length ? 2800 : 75)
 }
-typeStep(reduced ? DEMO_TEXT.length : 0)
+typeStep(reduced ? DEMO.length : 0)
 
-/* ── style demos ────────────────────────────────────────── */
-
-function renderDemos(col) {
-  const html = col.items.slice(0, 3).map(card).join("")
-  document.getElementById("demoCalm").innerHTML = html
-  document.getElementById("demoLedger").innerHTML = html
-}
-
-document.querySelectorAll("[data-look-set]").forEach(b => b.addEventListener("click", () => {
-  document.documentElement.dataset.look = b.dataset.lookSet
-  document.querySelectorAll("[data-look-set]").forEach(x => x.classList.toggle("on", x === b))
-}))
-
-document.getElementById("themeBtn").addEventListener("click", () => {
-  const root = document.documentElement
-  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches
-  root.dataset.theme = dark ? "light" : "dark"
+$("themeBtn").addEventListener("click", () => {
+  const r = document.documentElement
+  const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches
+  r.dataset.theme = dark ? "light" : "dark"
 })
 
 /* ════════════════════════════════════════════════════════════
-   Feature menu
+   Options (round 2 decisions)
    ════════════════════════════════════════════════════════════ */
 
-const FEATURES = {
-  "Capture": [
-    ["f-shorthand",  "Todoist-style shorthand",        "#project @label p1 dates, highlighted as you type"],
-    ["f-deadline",   "Separate deadline token",        "{fri} sets a deadline, plain dates set scheduled"],
-    ["f-voice",      "Voice capture",                  "Dictate on widget or watch, parsed the same way"],
-    ["f-share",      "Share sheet and email-in",       "Send a link, mail or selection straight to Inbox"],
-    ["f-hotkey",     "Global desktop hotkey",          "Capture window over any app"],
-    ["f-templates",  "Capture templates",              "Snippets like ;groceries expand into a task with a checklist"],
-  ],
-  "Organize": [
-    ["f-fields",     "Custom fields",                  "Energy, estimate, context; typed and filterable"],
-    ["f-recur",      "Smart recurrence",               "every 2nd tue, every 3 days after done"],
-    ["f-subtasks",   "Subtasks and checklists",        "Nested tasks versus a lightweight checklist"],
-    ["f-deps",       "Dependencies",                   "Blocked tasks hide until the blocker is done"],
-    ["f-urgency",    "Computed urgency score",         "Taskwarrior-like formula you can tune"],
-  ],
-  "Views": [
-    ["f-lanes",      "Filter-lane boards",             "Columns defined by queries, as in this prototype"],
-    ["f-drag",       "Drag between lanes rewrites dates", "Drop into This week and the task gets a date inside it"],
-    ["f-calendar",   "Calendar renderer",              "Same recipe drawn as a week grid with time blocks"],
-    ["f-group",      "Group within lanes",             "Swimlanes by project or priority"],
-    ["f-review",     "Weekly review mode",             "Step through stale and undated tasks one at a time"],
-    ["f-gcal",       "Calendar overlay",               "Show meetings beside tasks to plan the day"],
-  ],
-  "Extensibility": [
-    ["f-recipes",    "Recipes as text",                "Copy, paste and share whole views"],
-    ["f-formulas",   "Formula fields",                 "Computed values, spreadsheet-style"],
-    ["f-plugins",    "Sandboxed plugins",              "JS or WASM: new renderers, parsers, automations"],
-    ["f-api",        "API, webhooks, CLI",             "Script it, automate it, pipe from the terminal"],
-    ["f-themes",     "Theme and density tokens",       "Beyond light and dark: user-made skins"],
-    ["f-ai",         "AI triage helper",               "Suggest dates and lanes for Inbox items, opt-in"],
-  ],
-  "Platforms": [
-    ["f-widgets",    "Home and lock screen widgets",   "Capture bar, one-tap add, live lane"],
-    ["f-offline",    "Offline-first sync",             "Never block capture on network"],
-    ["f-import",     "Todoist import",                 "Bring projects, labels, filters on day one"],
-    ["f-watch",      "Watch app",                      "Capture and tick off from the wrist"],
-    ["f-selfhost",   "Self-hostable sync server",      "Own your data"],
-  ],
-}
+const OPTIONS = [
+  { id: "deadline", title: "Deadline syntax", why: "Braces are 6+ taps on a phone. Plain words need no symbol at all.", choices: [
+    ["words",  "Words", "<code>by fri</code> · <code>before 12 dec</code>. Reads like speech. The rare clash is fixed with quotes or by tapping the chip.", true],
+    ["dollar", "Dollar prefix", "<code>$fri</code>. Two taps on both keyboards and unambiguous, but a weak mnemonic."],
+    ["both",   "Both", "Words for everyday use, <code>$</code> as a precise alias."],
+  ]},
+  { id: "priority", title: "Priority syntax", why: "<code>!1</code> and <code>p1</code> cost the same taps. <code>!</code> reads as urgency.", choices: [
+    ["bang",  "!1 – !4, p1 – p4 also works", "Suggestions show <code>!</code>; Todoist habits keep working.", true],
+    ["p",     "p1 – p4 only", "Exactly like Todoist."],
+    ["bangs", "!!! / !! / !", "Count the marks. Fast, but four levels get awkward."],
+  ]},
+  { id: "project", title: "Project character", why: "<code>#</code> sits on the third keyboard layer on iOS.", choices: [
+    ["bar",   "Keep # with an accessory key", "Familiar from Todoist; the key makes it one tap.", true],
+    ["slash", "Also accept /home", "<code>/</code> is on the 123 layer on both, but it clashes with dates like 1/12."],
+  ]},
+  { id: "drag", title: "Dragging into a lane sets…", why: "You wanted drag to rewrite dates. Which date?", choices: [
+    ["earliest", "The earliest date that fits", "Today → Next 7 days means tomorrow. Predictable, keeps work close.", true],
+    ["latest",   "The lane's last day", "Pushes as far as the lane allows."],
+    ["ask",      "A mini date picker", "Precise, but adds a step to every drag."],
+  ]},
+  { id: "pinned", title: "When a deadline pins a task", why: "A task due by Friday can't leave the 7-day lane by rescheduling.", choices: [
+    ["explain", "Refuse and say why", "Toast: \"Its deadline keeps it in Next 7 days\". Try dragging Renew passport.", true],
+    ["ignore",  "Lanes follow the scheduled date only", "Deadline becomes a badge, not a lane input. Simpler model, weaker deadlines."],
+  ]},
+  { id: "fields", title: "Custom fields at capture", why: "You want custom fields. How do values get in?", choices: [
+    ["colon", "name:value", "<code>energy:low</code>. Colon is 2 taps; autocomplete does the rest.", true],
+    ["value", "Value only", "<code>low</code> alone when unique across fields. Magic, can surprise."],
+    ["ui",    "Task detail only", "No syntax; set after capture."],
+  ]},
+  { id: "deps", title: "Dependencies", why: "Blocked tasks hide until the blocker is done.", choices: [
+    ["detail", "Link in task detail", "Search and pick. Common enough for UI, rare enough to skip syntax.", true],
+    ["syntax", "after:task-name", "Typed with autocomplete. Fast on keyboards, fiddly on phones."],
+  ]},
+  { id: "density", title: "Density", why: "Both Calm and Ledger got a want.", choices: [
+    ["setting", "One look plus compact rows", "Try it in the board's view settings.", true],
+    ["themes",  "Two named themes", "Ledger stays its own skin with monospace details."],
+  ]},
+  { id: "lanes", title: "Default Horizons lanes", why: "Rolling windows never empty out at month end. Calendar periods match how people talk.", choices: [
+    ["rolling",  "Today · 7 · 30 · 90 days", "What the board shows now.", true],
+    ["calendar", "Today · this week · month · quarter", "Lanes shrink as a period ends."],
+  ]},
+]
 
-document.getElementById("feats").innerHTML = Object.entries(FEATURES).map(([group, list]) => `
-  <div class="feat-group">
-    <h3>${group}</h3>
-    ${list.map(([key, name, desc]) => `
-      <div class="feat"><div><b>${esc(name)}</b><small>${esc(desc)}</small></div><span data-fb="${key}" data-fb-label="${esc(name)}"></span></div>`).join("")}
+$("opts").innerHTML = OPTIONS.map(o => `
+  <div class="opt">
+    <h3>${o.title}</h3><p>${o.why}</p>
+    <div class="choices">${o.choices.map(([k, name, desc, rec]) => `
+      <div class="choice${rec ? " rec" : ""}">
+        <div class="pinrow"><b>${name}</b><span data-fb="o-${o.id}-${k}" data-fb-label="${esc(o.title)}: ${esc(name)}"></span></div>
+        ${rec ? `<span class="rec-tag">Recommended</span>` : ""}
+        <p>${desc}</p>
+      </div>`).join("")}
+    </div>
   </div>`).join("")
 
 /* ════════════════════════════════════════════════════════════
-   Feedback pins — stored in shared db (Claude reads them back),
-   local-storage fallback when db is unavailable
+   Feedback pins → shared db (collection feedback2), local fallback
    ════════════════════════════════════════════════════════════ */
 
-const marks = {}                    // key → { v, note, label }
-const LS = "sift-marks"
+const COL = "feedback2", LS = "dolist-marks-2"
+const marks = {}
 let db = null
 
-const labelFor = key => {
-  const el = document.querySelector(`[data-fb="${key}"]`)
-  if (el?.dataset.fbLabel) return el.dataset.fbLabel
-  const host = el?.closest(".principle, .look, .phone-wrap, .panel, .sec-head, .feat, .qa, .boardbar, .side")
-  return host?.querySelector("h2, h3, b")?.textContent?.trim() || key
-}
+const labelFor = key => document.querySelector(`[data-fb="${key}"]`)?.dataset.fbLabel || key
 
-const pinHTML = key => `
+document.querySelectorAll("[data-fb]").forEach(el => (el.innerHTML = `
   <span class="fb" role="group" aria-label="Your verdict">
-    <button data-v="want"  aria-pressed="false" title="Want">${ico("up")}want</button>
+    <button data-v="want"  aria-pressed="false" title="Want">${ico("up")}</button>
     <button data-v="maybe" aria-pressed="false" title="Maybe">${ico("maybe")}</button>
     <button data-v="nope"  aria-pressed="false" title="Nope">${ico("down")}</button>
-  </span>`
+  </span>`))
 
-document.querySelectorAll("[data-fb]").forEach(el => (el.innerHTML = pinHTML(el.dataset.fb)))
-
+const drawer = $("drawer")
 function paintPins() {
   document.querySelectorAll("[data-fb]").forEach(el => {
     const v = marks[el.dataset.fb]?.v
     el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)))
   })
-  document.getElementById("marksN").textContent = Object.values(marks).filter(m => m.v).length
+  $("marksN").textContent = Object.values(marks).filter(m => m.v).length
   if (!drawer.hidden) renderDrawer()
 }
 
@@ -1071,26 +1251,21 @@ async function saveMark(key) {
   try { localStorage.setItem(LS, JSON.stringify(marks)) } catch {}
   if (!db) return
   try {
-    const ref = db.collection("feedback").doc(key)
+    const ref = db.collection(COL).doc(key)
     m?.v ? await ref.set({ v: m.v, note: m.note || "", label: m.label, at: Date.now() }) : await ref.delete()
-  } catch (e) { setSync(`Not saved to shared store (${e.code || "error"}); kept in this browser`) }
+  } catch (e) { setSync(`Couldn't save to the shared store (${e.code || "error"}). Kept in this browser.`) }
 }
 
 document.addEventListener("click", e => {
-  const b = e.target.closest(".fb button")
-  if (!b) return
+  const b = e.target.closest(".fb button"); if (!b) return
   const key = b.closest("[data-fb]").dataset.fb
   const cur = marks[key] || { note: "", label: labelFor(key) }
   cur.v = cur.v === b.dataset.v ? null : b.dataset.v
   marks[key] = cur
-  paintPins()
-  saveMark(key)
+  paintPins(); saveMark(key)
 })
 
-/* ── marks drawer ───────────────────────────────────────── */
-
-const drawer = document.getElementById("drawer")
-let syncMsg = "Saving to this browser only"
+let syncMsg = "Saved in this browser only"
 const setSync = msg => { syncMsg = msg; const el = drawer.querySelector(".sync"); if (el) el.textContent = msg }
 
 function renderDrawer() {
@@ -1101,33 +1276,26 @@ function renderDrawer() {
       <div class="mrow">
         <div><span>${esc(m.label)}</span><span class="tag ${m.v}">${m.v}</span></div>
         <textarea id="note-${esc(k)}" data-note="${esc(k)}" placeholder="Why? (optional)">${esc(m.note || "")}</textarea>
-      </div>`).join("") : `<p class="muted" style="font-size:.9rem">Nothing marked yet. Use the want · ? · nope pins next to anything on the page.</p>`}`
+      </div>`).join("") : `<p class="muted" style="font-size:.9rem">Nothing marked yet. Use the thumbs next to anything on the page.</p>`}`
 }
 
 let noteTimer
 drawer.addEventListener("input", e => {
-  const k = e.target.dataset.note
-  if (!k) return
+  const k = e.target.dataset.note; if (!k) return
   marks[k].note = e.target.value
-  clearTimeout(noteTimer)
-  noteTimer = setTimeout(() => saveMark(k), 600)
+  clearTimeout(noteTimer); noteTimer = setTimeout(() => saveMark(k), 600)
 })
-document.getElementById("marksBtn").addEventListener("click", () => {
-  drawer.hidden = !drawer.hidden
-  if (!drawer.hidden) renderDrawer()
-})
-document.getElementById("pinsToggle").addEventListener("change", e => document.body.classList.toggle("no-pins", !e.target.checked))
+$("marksBtn").addEventListener("click", () => { drawer.hidden = !drawer.hidden; if (!drawer.hidden) renderDrawer() })
 
-// Boot: local marks first, then shared store when available
 try { Object.assign(marks, JSON.parse(localStorage.getItem(LS) || "{}")) } catch {}
 paintPins()
 
 ;(async () => {
   db = await window.claude?.use?.("db").catch(() => null)
   if (!db) return
-  setSync("Saved · Claude can read these")
-  const timer = setTimeout(() => setSync("Shared store is slow; marks kept locally"), 10000)
-  db.collection("feedback").onSnapshot(snap => {
+  setSync("Saved. Claude can read these.")
+  const timer = setTimeout(() => setSync("The shared store is slow. Marks are kept locally for now."), 10000)
+  db.collection(COL).onSnapshot(snap => {
     clearTimeout(timer)
     snap.docChanges().forEach(({ type, doc }) => {
       const x = doc.data()
@@ -1135,21 +1303,21 @@ paintPins()
       else if (x) marks[doc.id] = { v: x.v, note: x.note, label: x.label }
     })
     paintPins()
-  }, () => { clearTimeout(timer); setSync("Shared store unavailable; marks kept locally"); db = null })
+  }, () => { clearTimeout(timer); setSync("The shared store is unavailable. Marks are kept locally."); db = null })
 })()
 
-/* ── nav highlight ──────────────────────────────────────── */
+/* ── nav ────────────────────────────────────────────────── */
 
 const navLinks = [...document.querySelectorAll("#nav a")]
 navLinks.forEach(a => a.addEventListener("click", e => {
   e.preventDefault()
   document.querySelector(a.getAttribute("href")).scrollIntoView({ behavior: reduced ? "auto" : "smooth" })
 }))
-const io = new IntersectionObserver(entries => entries.forEach(en => {
+const io = new IntersectionObserver(es => es.forEach(en => {
   if (en.isIntersecting) navLinks.forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id))
 }), { rootMargin: "-40% 0px -55% 0px" })
 document.querySelectorAll("main section").forEach(s => io.observe(s))
 
-renderBoard()
+render()
 syncQA()
 </script>
