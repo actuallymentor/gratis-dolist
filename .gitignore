@@ -159,3 +159,5 @@ dist/
 node_modules/
 .wrangler/
 fixtures/private/
+test-results/
+playwright-report/

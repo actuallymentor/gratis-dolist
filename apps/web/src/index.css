@@ -1,0 +1,41 @@
+/* Design tokens, carried over from the approved prototype ("one look") */
+:root {
+    --page: #fafbfc; --surface: #ffffff; --sunk: #f2f5f7; --line: #e5e9ed; --line-soft: #eef1f4;
+    --fg: #1a1a2e; --muted: #6b7280; --faint: #9aa3ad;
+    --accent: #7ec0d0; --accent-strong: #376675; --accent-tint: #7ec0d024;
+    --p1: #d0603e; --p2: #b8860b; --p3: #376675; --p4: #9aa3ad;
+    --ok: #2f8a5b; --bad: #c2453a;
+    --font-head: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --radius: 10px; --radius-sm: 7px;
+    --ease: cubic-bezier(.2,.8,.2,1);
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652; --line-soft: #0d3f4b;
+    --fg: #e6ecf0; --muted: #aab6c1; --faint: #6f8792; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
+    --p1: #e98a6a; --p2: #f0c040; --p3: #7ec0d0; --p4: #6f8792; --ok: #5cc28a; --bad: #ef7d70;
+    color-scheme: dark;
+} }
+
+:root[data-theme="dark"] {
+    --page: #002b36; --surface: #073642; --sunk: #04313c; --line: #134652; --line-soft: #0d3f4b;
+    --fg: #e6ecf0; --muted: #aab6c1; --faint: #6f8792; --accent-strong: #7ec0d0; --accent-tint: #7ec0d01f;
+    --p1: #e98a6a; --p2: #f0c040; --p3: #7ec0d0; --p4: #6f8792; --ok: #5cc28a; --bad: #ef7d70;
+    color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box }
+[hidden] { display: none !important }
+html { font-size: 100% }
+body { margin: 0; background: var(--page); color: var(--fg); font: 400 1rem/1.5 var(--font-body) }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 500; margin: 0; text-wrap: balance }
+p { margin: 0 }
+button, input { font: inherit; color: inherit }
+a { color: inherit }
+:focus-visible { outline: none; box-shadow: 0 0 0 5px var(--accent-tint), 0 0 0 1px var(--accent) }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important }
+}

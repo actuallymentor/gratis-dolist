@@ -1,12 +1,12 @@
-// Cloudflare Worker: static assets only (no script yet).
+// Cloudflare Worker: static assets only for now (the PWA in apps/web).
 // Deployed exclusively by .github/workflows/deploy.yml; add D1/KV bindings when sync lands.
 {
   "name": "dolist",
   "compatibility_date": "2026-11-01",
 
-  // Output of `node scripts/build.mjs`
+  // Output of `npm run build`
   "assets": {
-    "directory": "./dist",
+    "directory": "./apps/web/dist",
     "not_found_handling": "single-page-application"
   },
 

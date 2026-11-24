@@ -7,3 +7,4 @@
 - 2026-11-24 Cloudflare Worker `dolist` (static assets) + GH Actions deploy workflow; custom domain dolist.gratis.sh attached on first deploy.
 - 2026-11-24 Implementation plan v2 (docs/IMPLEMENTATION_PLAN.md) after 5-persona codex review; M0 = foundation + 3 spikes, replaces brainstorm page on prod.
 - 2026-11-24: §7 answered — either-date soonest wins; PWA only first (native → Later); Todoist token in .env.local
+- 2026-11-24: M0 shell — npm workspaces (apps/web Vite React PWA, packages/core), airier lint, Vitest, Playwright vs wrangler dev, CI check job + SHA-pinned actions, deploy ships tested artifact. Prototype no longer deployed.

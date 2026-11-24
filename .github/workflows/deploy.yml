@@ -1,37 +1,66 @@
 name: Deploy
 
-# Every push to main ships to https://dolist.gratis.sh
+# PRs: lint + test + build + e2e, no secrets.
+# main: the same checks, then ship to https://dolist.gratis.sh
 on:
+  pull_request:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-# Never run two deploys at once; the newest push wins
+# Never run two production deploys at once; the newest push wins
 concurrency:
-  group: deploy-production
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'deploy-production' }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint:check
+      - run: npm test
+      - run: npm run build
+
+      - name: End-to-end (Chromium)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 7
+
   deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: production
       url: https://dolist.gratis.sh
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v7
+      # Ship exactly what was tested
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          node-version: 24
-
-      - name: Build static site
-        run: node scripts/build.mjs
+          name: web-dist
+          path: apps/web/dist
 
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v4
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
