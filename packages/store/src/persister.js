@@ -36,6 +36,16 @@ const request = req => new Promise( ( resolve, reject ) => {
     req.onerror = () => reject( req.error )
 } )
 
+// Rejects with the original error, but lets `on_error` see it first (TinyBase swallows persister errors)
+const reporting = ( action, on_error ) => async ( ...args ) => {
+    try {
+        return await action( ...args )
+    } catch ( error ) {
+        on_error( error )
+        throw error
+    }
+}
+
 const map_values = ( obj, fn ) => Object.fromEntries( Object.entries( obj ).map( ( [ key, value ] ) => [ key, fn( value, key ) ] ) )
 const hashes_of = stamps => map_values( stamps, ( [ , , hash ] ) => hash )
 
@@ -46,15 +56,21 @@ const hashes_of = stamps => map_values( stamps, ( [ , , hash ] ) => hash )
  * @param {Object} [options]
  * @param {string} [options.durability] - `strict` fsyncs each commit (survives power loss, ~1 ms)
  * @param {Function} [options.on_ignored_error]
- * @returns {{ persister: Object, close: Function }} close() closes the IDB connection after persister.destroy()
+ * @param {Function} [options.on_save_error] - called with each failed write (quota, aborted tx, ...)
+ * @returns {{ persister: Object, close: Function, load_error: Function }} close() closes the IDB connection after
+ *   persister.destroy(); load_error() returns the error of the last failed load, or null
  */
-export const create_idb_persister = ( store, name, { durability = `strict`, on_ignored_error } = {} ) => {
+export const create_idb_persister = ( store, name, { durability = `strict`, on_ignored_error, on_save_error = () => {} } = {} ) => {
 
     const db_promise = open_db( name )
 
     // startAutoSave() always starts with a full save. Right after loading into an empty
     // store memory == disk, so that rewrite (~1 s at 4x CPU for 10k tasks) is skipped.
     let just_loaded = false
+
+    // A full save may only replace disk once memory is known to mirror it (a load succeeded)
+    let loaded = false
+    let last_load_error = null
 
     // Full read → hashed MergeableContent
     const get_persisted = async () => {
@@ -67,6 +83,8 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
             request( tx.objectStore( VALS ).getAllKeys() ),
             request( tx.objectStore( VALS ).getAll() ),
         ] )
+        loaded = true
+        last_load_error = null
         if( !keys.length && !value_keys.length ) return undefined
         just_loaded = store.getRowCount( `tasks` ) === 0
 
@@ -122,7 +140,7 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
                 vals.put( [ value, hlc, getCellHash( value, hlc ) ], [ ``, value_id ] )
             } )
 
-        } else {
+        } else if( loaded ) {
 
             // Full save: mergeable content already carries hashes
             const [ [ tables ], [ values ] ] = get_content()
@@ -133,14 +151,32 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
             } )
             Object.entries( values ).forEach( ( [ value_id, stamp ] ) => vals.put( stamp, [ ``, value_id ] ) )
 
+        } else {
+
+            // Full save without a successful load: disk may hold rows memory never saw (failed read),
+            // so merge cell by cell and never clear. An empty store then writes nothing.
+            const [ [ tables ], [ values ] ] = get_content()
+            Object.entries( tables ).forEach( ( [ table_id, [ table_rows ] ] ) => {
+                Object.entries( table_rows ).forEach( ( [ row_id, [ cells ] ] ) => merge_row( rows, [ table_id, row_id ], cells ) )
+            } )
+            Object.entries( values ).forEach( ( [ value_id, [ value, hlc ] ] ) => vals.put( [ value, hlc, getCellHash( value, hlc ) ], [ ``, value_id ] ) )
+
         }
 
         await tx_done( tx )
     }
 
-    // No cross-tab polling: the BroadcastChannel synchronizer covers tabs
-    const persister = createCustomPersister( store, get_persisted, set_persisted, () => null, () => {}, on_ignored_error, MERGEABLE_STORE_ONLY )
-    const close = async () => ( await db_promise ).close()
+    // Remember load failures and report save failures before TinyBase swallows them
+    const remember_load_error = error => {
+        last_load_error = error
+    }
+    const load = reporting( get_persisted, remember_load_error )
+    const save = reporting( set_persisted, on_save_error )
 
-    return { persister, close }
+    // No cross-tab polling: the BroadcastChannel synchronizer covers tabs
+    const persister = createCustomPersister( store, load, save, () => null, () => {}, on_ignored_error, MERGEABLE_STORE_ONLY )
+    const close = async () => ( await db_promise.catch( () => null ) )?.close()
+    const load_error = () => last_load_error
+
+    return { persister, close, load_error }
 }

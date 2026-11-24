@@ -32,19 +32,28 @@ describe( `from_todoist`, () => {
     const { projects, labels, tasks } = from_todoist( sample )
     const by_id = Object.fromEntries( tasks.map( task => [ task.todoist_id, task ] ) )
 
-    it( `maps projects (Inbox = no project, parents by name, deleted dropped)`, () => {
+    it( `maps projects (Inbox = no project, parents by todoist id, deleted dropped)`, () => {
         expect( projects ).toEqual( [
             { todoist_id: `p1`, name: `Work`, color: `blue` },
-            { todoist_id: `p2`, name: `Clients`, color: `red`, parent: `Work` },
+            { todoist_id: `p2`, name: `Clients`, color: `red`, parent_todoist_id: `p1`, parent: `Work` },
         ] )
         expect( labels ).toEqual( [ { todoist_id: `l1`, name: `call` } ] )
     } )
 
     it( `inverts priority and maps dates, time, deadline, duration`, () => {
         expect( by_id.t1 ).toMatchObject( { title: `Plain`, priority: null, scheduled: null, time: null, labels: [], created_at: Date.parse( `2026-01-01T10:00:00Z` ) } )
-        expect( by_id.t1.project ).toBeUndefined()
-        expect( by_id.t2 ).toMatchObject( { priority: 1, project: `Clients`, labels: [ `call` ], scheduled: `2026-11-16`, time: `10:00`, deadline: `2026-11-20`, duration: 30, notes: `notes` } )
+        expect( by_id.t1 ).not.toHaveProperty( `project_todoist_id` )
+        expect( by_id.t2 ).toMatchObject( { priority: 1, project_todoist_id: `p2`, project: `Clients`, labels: [ `call` ], scheduled: `2026-11-16`, time: `10:00`, deadline: `2026-11-20`, duration: 30, notes: `notes` } )
         expect( by_id.t3 ).toMatchObject( { priority: 3, parent_todoist_id: `t2`, scheduled: `2026-10-09`, time: `08:00`, tz: `Europe/Amsterdam` } )
+    } )
+
+    it( `references same-named projects by todoist id`, () => {
+        const twins = from_todoist( {
+            projects: [ { id: `a`, name: `Admin` }, { id: `b`, name: `Admin` }, { id: `c`, name: `Sub`, parent_id: `b` } ],
+            tasks: [ { id: `x`, content: `In B`, project_id: `b` } ],
+        } )
+        expect( twins.projects[ 2 ] ).toMatchObject( { parent_todoist_id: `b` } )
+        expect( twins.tasks[ 0 ] ).toMatchObject( { project_todoist_id: `b` } )
     } )
 
     it( `parses recurrence or keeps it verbatim`, () => {
@@ -65,9 +74,12 @@ describe( `from_todoist`, () => {
 // Real export: private, gitignored; skipped in CI. Assertions only on shapes, never titles.
 const export_path = new URL( `../../../fixtures/private/todoist-export.json`, import.meta.url )
 
-describe.skipIf( !existsSync( export_path ) )( `from_todoist on the private export`, () => {
+// skipIf still runs this callback at collection: read the fixture only when it exists
+const has_export = existsSync( export_path )
 
-    const raw = JSON.parse( readFileSync( export_path, `utf8` ) )
+describe.skipIf( !has_export )( `from_todoist on the private export`, () => {
+
+    const raw = has_export ? JSON.parse( readFileSync( export_path, `utf8` ) ) : { tasks: [], completed: [], projects: [], labels: [] }
     const { projects, labels, tasks } = from_todoist( raw )
 
     it( `keeps every task, project and label`, () => {
@@ -83,12 +95,12 @@ describe.skipIf( !existsSync( export_path ) )( `from_todoist on the private expo
     } )
 
     it( `produces valid cells`, () => {
-        const names = new Set( projects.map( project => project.name ) )
+        const project_ids = new Set( projects.map( project => project.todoist_id ) )
         tasks.forEach( task => {
             expect( [ 1, 2, 3, 4, null ] ).toContain( task.priority )
             if( task.scheduled ) expect( task.scheduled ).toMatch( /^\d{4}-\d{2}-\d{2}$/ )
             if( task.time ) expect( task.time ).toMatch( /^\d{2}:\d{2}$/ )
-            if( task.project ) expect( names.has( task.project ) ).toBe( true )
+            if( task.project_todoist_id ) expect( project_ids.has( task.project_todoist_id ) ).toBe( true )
         } )
     } )
 

@@ -7,6 +7,7 @@ import { from_todoist } from '@dolist/core'
 import { export_json, import_json, import_todoist } from '@dolist/store'
 import { use_store } from '@dolist/store/react'
 import { download_json, fetch_todoist } from '../../modules/todoist'
+import { flush } from '../../modules/dolist'
 import Page from '../atoms/Page'
 import { apply_theme, read_theme } from '../../modules/theme'
 import { hard_update } from '../../modules/pwa'
@@ -61,6 +62,9 @@ export default function SettingsPage() {
             // Accept both our own export and a raw Todoist export (scripts/todoist-export.mjs)
             if( json.app !== `dolist` && json.tasks && json.projects ) await import_todoist( store, from_todoist( json ) )
             else await import_json( store, json )
+
+            // Announce only once everything is on disk
+            await flush()
             toast( `Imported` )
         } catch ( error ) {
             toast( `Import failed: ${ error.message }` )
@@ -75,6 +79,7 @@ export default function SettingsPage() {
         try {
             const raw = await fetch_todoist( token.trim() )
             const result = await import_todoist( store, from_todoist( raw ) )
+            await flush()
             toast( `Imported ${ result?.tasks ?? raw.tasks.length } tasks from Todoist` )
         } catch ( error ) {
             toast( error.message )

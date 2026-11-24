@@ -2,31 +2,19 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { CalendarDays, Clock, Flag, Hash, Plus, Repeat, Tag, TriangleAlert } from 'lucide-react'
 import { parse_quick_add, resolve_date_label } from '@dolist/core'
-import { add_label, add_project, add_task } from '@dolist/store'
+import { add_label, add_project, add_task, get_projects } from '@dolist/store'
 import { use_labels, use_projects, use_store } from '@dolist/store/react'
+import toast from 'react-hot-toast'
 import Chip from '../atoms/Chip'
 import { use_app_store } from '../../stores/app'
 import { use_today } from '../../hooks/use_today'
 import { flush } from '../../modules/dolist'
+import { adopt_orphan_draft, read_draft as read_saved, write_draft as write_saved } from '../../modules/drafts'
 
-const DRAFT_KEY = `dolist:draft:quick-add`
-
-const read_draft = () => {
-    try {
-        return localStorage.getItem( DRAFT_KEY ) || ``
-    } catch {
-        return ``
-    }
-}
-
-const write_draft = text => {
-    try {
-        if( text ) localStorage.setItem( DRAFT_KEY, text )
-        else localStorage.removeItem( DRAFT_KEY )
-    } catch {
-        // Private mode: the draft lives only in memory
-    }
-}
+// This tab's quick-add draft (see modules/drafts.js)
+const DRAFT = `quick-add`
+const read_draft = () => read_saved( DRAFT )
+const write_draft = text => write_saved( DRAFT, text )
 
 const Box = styled.form`
     border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
@@ -95,12 +83,23 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const hl_ref = useRef( null )
     const [ text, set_text ] = useState( read_draft )
     const [ confirm_create, set_confirm_create ] = useState( false )
+    const last_text = useRef( text )
 
-    const parsed = useMemo( () => parse_quick_add( text, {
+    // A tab that closed with unsent text hands it to the next one opened
+    useEffect( () => {
+        if( !text ) adopt_orphan_draft( DRAFT ).then( adopted => adopted && set_text( adopted ) )
+    }, [] )  
+
+    // Wall-clock now (HH:MM), so "at 3pm" typed after 3pm rolls to tomorrow
+    const now_hhmm = () => new Date().toTimeString().slice( 0, 5 )
+    const parse = ( value, extra_projects = [], extra_labels = [] ) => parse_quick_add( value, {
         today,
-        projects: projects.map( ( { name } ) => name ),
-        labels: labels.map( ( { name } ) => name ),
-    } ), [ text, today, projects, labels ] )
+        now: now_hhmm(),
+        projects: [ ...projects.map( ( { name } ) => name ), ...extra_projects ],
+        labels: [ ...labels.map( ( { name } ) => name ), ...extra_labels ],
+    } )
+
+    const parsed = useMemo( () => parse( text ), [ text, today, projects, labels ] ) // parse is recreated per render
 
     const unknown = parsed.spans.filter( ( { unknown } ) => unknown )
 
@@ -108,6 +107,8 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     // Clearing the saved draft waits for the task's commit (see submit), so a kill in between loses nothing.
     useEffect( () => {
         if( text ) write_draft( text )
+        else if( read_draft() === last_text.current ) write_draft( `` )
+        last_text.current = text
         mark_unsaved( id, !!text.trim() )
     }, [ text, id, mark_unsaved ] )
     useEffect( () => () => mark_unsaved( id, false ), [ id, mark_unsaved ] )
@@ -120,14 +121,17 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const submit = event => {
 
         event.preventDefault()
-        const { task } = parsed
-        if( !task.title.trim() ) return
-
+        if( !parsed.task.title.trim() ) return
         if( unknown.length && !confirm_create ) return set_confirm_create( true )
+
+        // Create the confirmed names, then re-parse so the task actually gets them
         if( unknown.length ) create_unknowns()
+        const name_of = type => unknown.filter( span => span.type === type ).map( ( { value } ) => value )
+        const { task } = unknown.length ? parse( text, name_of( `project` ), name_of( `label` ) ) : parsed
+        const submitted = text
 
         const project_id = task.project
-            ? projects.find( ( { name } ) => name.toLowerCase() === task.project.toLowerCase() )?.id
+            ? get_projects( store ).find( ( { name } ) => name.toLowerCase() === task.project.toLowerCase() )?.id
             : defaults.project_id
         add_task( store, {
             ...task,
@@ -136,14 +140,19 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
             scheduled: task.scheduled ?? defaults.scheduled ?? null,
         } )
 
+        // The saved draft stays until the commit lands (below), so don't let the clear-effect remove it
+        last_text.current = ``
         set_text( `` )
         set_confirm_create( false )
         input_ref.current?.focus()
-        flush().then( () => !input_ref.current?.value && write_draft( `` ) )
+
+        // Clear the saved draft only once committed, and only if it's still ours (another tab may have its own)
+        flush()
+            .then( () => read_draft() === submitted && write_draft( `` ) )
+            .catch( () => toast( `Couldn't save “${ task.title }”. Your text is kept as a draft.` ) )
     }
 
     const change = ( { target: { value } } ) => {
-        if( !value ) write_draft( `` )
         set_text( value )
         set_confirm_create( false )
     }

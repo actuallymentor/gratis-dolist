@@ -171,11 +171,12 @@ const named = ( type, match, { project_index: index, labels } ) => {
 
 const RULES = [
 
-    { type: `project`, regex: new RegExp( `${ B }#(?:${ QUOTED_NAME }|${ BARE_NAME })`, `g` ), read: ( match, ctx ) => named( `project`, match, ctx ) },
-    { type: `label`, regex: new RegExp( `${ B }@(?:${ QUOTED_NAME }|${ BARE_NAME })`, `g` ), read: ( match, ctx ) => named( `label`, match, ctx ) },
-
+    // Quoted literals claim first, so nothing inside quotes (#home, @Bob, today) ever parses.
     // Opening quote must start a token; an unclosed quote runs to the end (still typing)
     { type: `literal`, regex: new RegExp( String.raw`(?<=^|[\s(])["“]([^"“”\n]*)(?:["”]|$)`, `g` ), read: match => ( { value: match[ 1 ] } ) },
+
+    { type: `project`, regex: new RegExp( `${ B }#(?:${ QUOTED_NAME }|${ BARE_NAME })`, `g` ), read: ( match, ctx ) => named( `project`, match, ctx ) },
+    { type: `label`, regex: new RegExp( `${ B }@(?:${ QUOTED_NAME }|${ BARE_NAME })`, `g` ), read: ( match, ctx ) => named( `label`, match, ctx ) },
 
     { type: `recur`, regex: new RegExp( `${ B }every!?\\s+(?:${ RECUR_BODY_SRC })${ E }`, `gi` ), read: match => {
         const recur = parse_recur( match[ 0 ] )

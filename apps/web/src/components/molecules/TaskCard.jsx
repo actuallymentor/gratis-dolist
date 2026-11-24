@@ -1,11 +1,12 @@
 import { memo } from 'react'
 import styled from 'styled-components'
-import { CalendarDays, Clock, Flag, Hash, Repeat, Tag } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Clock, Flag, Hash, Repeat, Tag } from 'lucide-react'
 import { resolve_date_label } from '@dolist/core'
 import Check from '../atoms/Check'
 
 const Card = styled.article`
-    display: grid; grid-template-columns: auto 1fr; gap: .2rem .6rem; align-items: start;
+    position: relative;
+    display: grid; grid-template-columns: auto 1fr auto; gap: .2rem .6rem; align-items: start;
     padding: .6rem .75rem; border-radius: var(--radius-sm);
     background: var(--surface); border: 1px solid var(--line-soft);
     transition: border-color 160ms var(--ease), opacity 300ms var(--ease), transform 300ms var(--ease);
@@ -18,6 +19,13 @@ const Card = styled.article`
         all: unset; cursor: pointer; font-size: .95rem; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere;
         &:focus-visible { box-shadow: 0 0 0 5px var(--accent-tint); border-radius: 4px }
     }
+    .move {
+        all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -.35rem -.4rem 0 0;
+        border-radius: 999px; color: var(--faint); opacity: 0; transition: opacity 160ms var(--ease);
+        &:hover, &:focus-visible { background: var(--sunk); color: var(--fg); opacity: 1 }
+    }
+    &:hover .move, &:focus-within .move { opacity: 1 }
+    @media ( hover: none ) { .move { opacity: 1 } }
     .meta { grid-column: 2; display: flex; gap: .6rem; flex-wrap: wrap; font-size: .78rem; color: var(--muted) }
     .meta:empty { display: none }
     .meta span { display: inline-flex; align-items: center; gap: .22rem }
@@ -29,7 +37,7 @@ const Card = styled.article`
  * One task: check, title (opens detail), quiet meta line.
  * Stateless apart from props; memoized because lanes render many.
  */
-function TaskCard( { task, today, done, leaving, draggable, on_complete, on_open, on_drag_start } ) {
+function TaskCard( { task, today, done, leaving, draggable, on_complete, on_open, on_move, on_drag_start } ) {
 
     const { title, priority, scheduled, deadline, time, labels = [], project, recur } = task
     const late = scheduled && scheduled < today
@@ -37,6 +45,7 @@ function TaskCard( { task, today, done, leaving, draggable, on_complete, on_open
     return <Card data-leaving={ leaving || undefined } draggable={ draggable || undefined } onDragStart={ on_drag_start } data-task-id={ task.id }>
         <Check $priority={ priority } $done={ done } aria-label={ `Complete ${ title }` } onClick={ () => on_complete?.( task ) } />
         <button className="title" onClick={ () => on_open?.( task ) }>{ title }</button>
+        { on_move ? <button className="move" aria-label={ `Move ${ title }` } title="Move (M)" onClick={ () => on_move( task ) }><ArrowRightLeft size={ 16 } strokeWidth={ 1.5 } /></button> : <span /> }
         <div className="meta">
             { scheduled && <span className={ late ? `late` : undefined }><CalendarDays size={ 12 } aria-hidden />{ resolve_date_label( scheduled, today ) }</span> }
             { time && <span><Clock size={ 12 } aria-hidden />{ time }</span> }

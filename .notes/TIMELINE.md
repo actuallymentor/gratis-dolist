@@ -10,3 +10,4 @@
 - 2026-11-24: M0 shell — npm workspaces (apps/web Vite React PWA, packages/core), airier lint, Vitest, Playwright vs wrangler dev, CI check job + SHA-pinned actions, deploy ships tested artifact. Prototype no longer deployed.
 - 2026-11-24: Spike A → TinyBase go (≥10.1) with own incremental IDB persister + server-time clock. Spike C corpus done.
 - 2026-11-24: M1 daily core integrated (core grammar/recurrence/recipes, store w/ incremental IDB, web UI). Real Todoist import via UI: 793 tasks / 2.8 s. Todo: render markdown links in titles.
+- 2026-11-24: M1 review fixes (5 personas agreed): load-failure wipe, flush false-success, per-tab drafts, detail commit-on-close, todoist id refs, literal-first grammar, lane/list paging. 10k @4x: Horizons 1.33 s, Today 1.01 s. Complete→ack 366 ms @4x: measure on real hardware.

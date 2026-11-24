@@ -77,6 +77,34 @@ describe( `tasks`, () => {
         expect( get_tasks( store ) ).toHaveLength( 1 )
     } )
 
+    it( `deleting a parent orphans live subtasks into its project`, () => {
+        const { store } = make()
+        const project_id = add_project( store, `Home` )
+        const parent = add_task( store, { title: `Move`, project_id } )
+        const child = add_task( store, { title: `Pack`, parent_id: parent } )
+        const elsewhere = add_task( store, { title: `Label boxes`, parent_id: parent, project_id: add_project( store, `Other` ) } )
+        const gone = add_task( store, { title: `Old`, parent_id: parent } )
+        delete_task( store, gone )
+
+        delete_task( store, parent )
+        expect( get_task( store, child ) ).toMatchObject( { project_id } )
+        expect( get_task( store, child ) ).not.toHaveProperty( `parent_id` )
+        expect( get_task( store, elsewhere ) ).toMatchObject( { project_id } )
+        expect( store.getCell( `tasks`, gone, `parent_id` ) ).toBe( parent )
+
+        // Restore does not re-parent
+        restore_task( store, parent )
+        expect( get_task( store, child ) ).not.toHaveProperty( `parent_id` )
+    } )
+
+    it( `orphans subtasks of an Inbox parent into the Inbox`, () => {
+        const { store } = make()
+        const parent = add_task( store, { title: `Move` } )
+        const child = add_task( store, { title: `Pack`, parent_id: parent, project_id: add_project( store, `Stale` ) } )
+        delete_task( store, parent )
+        expect( store.getRow( `tasks`, child ) ).not.toHaveProperty( `project_id` )
+    } )
+
     it( `falls back to Inbox when the project is deleted`, () => {
         const { store } = make()
         const project_id = add_project( store, `Gone` )

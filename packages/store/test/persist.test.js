@@ -1,6 +1,8 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createMergeableStore } from 'tinybase'
 import { add_task, create_dolist_store, get_tasks, import_json, update_task } from '../src/index.js'
+import { create_idb_persister } from '../src/persister.js'
 
 let counter = 0
 const open = []
@@ -65,6 +67,78 @@ describe( `IndexedDB persistence`, () => {
         const b = await boot( name )
         const id = add_task( a.store, { title: `From A` } )
         await vi.waitFor( () => expect( b.store.getCell( `tasks`, id, `title` ) ).toBe( `From A` ) )
+    } )
+
+} )
+
+describe( `IndexedDB failures`, () => {
+
+    // A database holding one task, closed again
+    const seeded = async () => {
+        const name = `db${ counter++ }`
+        const first = await boot( name )
+        const id = add_task( first.store, { title: `Precious` } )
+        await first.destroy()
+        return { name, id }
+    }
+
+    it( `a failed load rejects ready and never autosaves over disk`, async () => {
+        const { name, id } = await seeded()
+
+        const read = vi.spyOn( IDBObjectStore.prototype, `getAll` ).mockImplementation( () => {
+            throw new DOMException( `boom`, `UnknownError` )
+        } )
+        const clear = vi.spyOn( IDBObjectStore.prototype, `clear` )
+        const broken = create_dolist_store( { name } )
+        open.push( broken )
+        await expect( broken.ready ).rejects.toThrow( /Could not read local data.*boom/ )
+
+        // Edits after a failed boot stay in memory only
+        add_task( broken.store, { title: `Not saved` } )
+        await broken.flush()
+        expect( clear ).not.toHaveBeenCalled()
+        await broken.destroy()
+
+        read.mockRestore()
+        const healthy = await boot( name )
+        expect( get_tasks( healthy.store ).map( task => task.id ) ).toEqual( [ id ] )
+    } )
+
+    it( `a full save without a successful load merges instead of clearing`, async () => {
+        const { name, id } = await seeded()
+
+        // Raw persister, no load: startAutoSave()'s full save of an empty store
+        const store = createMergeableStore()
+        const { persister, close } = create_idb_persister( store, name )
+        const clear = vi.spyOn( IDBObjectStore.prototype, `clear` )
+        await persister.save()
+        persister.destroy()
+        await close()
+
+        expect( clear ).not.toHaveBeenCalled()
+        const reopened = await boot( name )
+        expect( reopened.store.getCell( `tasks`, id, `title` ) ).toBe( `Precious` )
+    } )
+
+    it( `flush rejects after a failed save and on_save_error hears it`, async () => {
+        const { store, flush, on_save_error } = await boot( `db${ counter++ }` )
+        const heard = []
+        const unsubscribe = on_save_error( error => heard.push( error.name ) )
+
+        const quota = vi.spyOn( IDBDatabase.prototype, `transaction` ).mockImplementationOnce( () => {
+            throw new DOMException( `full`, `QuotaExceededError` )
+        } )
+        add_task( store, { title: `Too big` } )
+        await expect( flush() ).rejects.toThrow( /1 save\(s\) to IndexedDB failed: full/ )
+        expect( heard ).toEqual( [ `QuotaExceededError` ] )
+
+        // Reported once: the next healthy write flushes clean
+        quota.mockRestore()
+        add_task( store, { title: `Fits` } )
+        await expect( flush() ).resolves.toBeUndefined()
+
+        unsubscribe()
+        expect( heard ).toHaveLength( 1 )
     } )
 
 } )

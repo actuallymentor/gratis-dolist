@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { QueryParamProvider } from 'use-query-params'
-import { Toaster } from 'react-hot-toast'
+import toast, { Toaster } from 'react-hot-toast'
+import EmptyState from './components/atoms/EmptyState'
+import Page from './components/atoms/Page'
+import { DatabaseZap } from 'lucide-react'
 import { StoreProvider } from '@dolist/store/react'
 import { RouterAdapter } from './hooks/query_params_adapter'
 import AppRoutes from './routes/Routes'
@@ -26,10 +29,15 @@ function Overlays() {
 
 export default function App() {
 
-    const [ ready, set_ready ] = useState( false )
+    // `ready` rejects when local data can't be read: never run (and autosave) on an empty store then
+    const [ status, set_status ] = useState( `loading` )
     useEffect( () => {
-        dolist.ready.then( () => set_ready( true ) )
+        dolist.ready.then( () => set_status( `ready` ) ).catch( () => set_status( `failed` ) )
+
+        // Every failed save surfaces; the ack that was waiting on it fails too
+        return dolist.on_save_error( () => toast.error( `Some changes couldn't be saved on this device. Keep this tab open and try again.`, { id: `save-error`, duration: 10_000 } ) )
     }, [] )
+    const ready = status === `ready`
 
     return <QueryParamProvider adapter={ RouterAdapter }>
         <Shell>
@@ -37,6 +45,11 @@ export default function App() {
                 <AppRoutes />
                 <Overlays />
             </StoreProvider> }
+            { status === `failed` && <Page title="Can't open your tasks">
+                <EmptyState icon={ DatabaseZap } title="Local data couldn't be read">
+                    Nothing was changed or deleted. Close other Dolist tabs, then reload. If it keeps happening, check that your browser allows site storage.
+                </EmptyState>
+            </Page> }
         </Shell>
         <Toaster position="bottom-center" toastOptions={ { style: TOAST_STYLE, duration: 5_000 } } />
         <UpdateBadge />

@@ -13,3 +13,5 @@
 - Acks must wait for `flush()` (apps/web/src/modules/dolist.js): an IDB write aborted by navigation within ms is lost. Toasts/draft-clear happen after commit.
 - TinyBase `persister.schedule()` with no args throws on an empty queue; wait for persister status idle (store's `flush()` does).
 - Lint `--fix` rewrites files mid-session → harness reports "changed on disk"; check `git diff` before assuming another agent touched it.
+- TinyBase persisters swallow load/save errors (tryCatch → onIgnoredError; status still goes Idle). Store wraps get/set_persisted to record them: failed load → `ready` rejects, no autosave; failed save → `flush()` rejects + `on_save_error`. Full save without a successful load merges, never clears.
+- `describe.skipIf` still runs the suite callback at collection: never read gitignored fixtures there unguarded.

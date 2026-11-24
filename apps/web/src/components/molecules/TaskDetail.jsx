@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Trash2, X } from 'lucide-react'
 import { parse_quick_add } from '@dolist/core'
@@ -7,6 +7,8 @@ import { use_labels, use_projects, use_store, use_tasks } from '@dolist/store/re
 import toast from 'react-hot-toast'
 import TaskCard from './TaskCard'
 import { use_today } from '../../hooks/use_today'
+import { use_task_actions } from '../../hooks/use_task_actions'
+import { use_app_store } from '../../stores/app'
 import { flush } from '../../modules/dolist'
 
 const Panel = styled.aside`
@@ -53,9 +55,14 @@ const recur_text = recur => {
 
 /**
  * Task detail: every field of one task, edited in place, saved per field on change/blur.
- * Escape or the close button returns focus to where the user was.
+ * Closing (Escape, close button, unmount) commits any text still being edited, and pending
+ * edits mark the tab unsaved so an automatic app update never reloads them away.
  */
 export default function TaskDetail( { task, on_close } ) {
+
+    const id = useId()
+    const mark_unsaved = use_app_store( state => state.mark_unsaved )
+    const { on_complete, on_open } = use_task_actions()
 
     const store = use_store()
     const projects = use_projects()
@@ -72,7 +79,46 @@ export default function TaskDetail( { task, on_close } ) {
     const subtasks = all_tasks.filter( ( { parent_id } ) => parent_id === task.id )
     const save = patch => update_task( store, task.id, patch )
 
-    // Focus management: focus the panel on open, close on Escape
+    const initial_labels = ( task.labels || [] ).join( `, ` )
+    const initial_recur = recur_text( task.recur )
+
+    const save_title = () => title.trim() && title !== task.title && save( { title: title.trim() } )
+    const save_notes = () => notes !== ( task.notes || `` ) && save( { notes } )
+
+    // Only re-parse Repeats when its text changed, anchored on the task's own date (not today),
+    // so tabbing through the field never shifts the schedule
+    const save_recur = () => {
+        const text = recur_input.trim()
+        if( text === initial_recur.trim() ) return
+        if( !text ) return save( { recur: null } )
+        const anchor = task.scheduled || task.deadline || today
+        const { task: parsed, spans } = parse_quick_add( `x ${ text.startsWith( `every` ) ? text : `every ${ text }` }`, { today: anchor } )
+
+        // Keep text the grammar didn't fully understand verbatim instead of half-parsing it
+        const recur_span = spans.find( ( { type } ) => type === `recur` )
+        const fully_parsed = parsed.recur && recur_span && parsed.title.trim() === `x`
+        save( { recur: fully_parsed ? parsed.recur : { raw: text, unparsed: true } } )
+    }
+
+    const save_labels = () => {
+        if( label_input === initial_labels ) return
+        const names = label_input.split( `,` ).map( name => name.trim().replace( /^@/, `` ) ).filter( Boolean )
+        set_labels( store, task.id, names )
+    }
+
+    // Latest committers, for close/unmount without stale closures
+    const commit_ref = useRef( null )
+    commit_ref.current = () => {
+        save_title()
+        save_notes()
+        save_labels()
+        save_recur()
+    }
+
+    const dirty = title !== task.title || notes !== ( task.notes || `` ) || label_input !== initial_labels || recur_input.trim() !== initial_recur.trim()
+    useEffect( () => mark_unsaved( id, dirty ), [ id, dirty, mark_unsaved ] )
+
+    // Focus management: focus the panel on open; Escape commits, then closes; unmount commits too
     useEffect( () => {
         const previous = document.activeElement
         panel_ref.current?.focus()
@@ -80,21 +126,11 @@ export default function TaskDetail( { task, on_close } ) {
         window.addEventListener( `keydown`, on_key )
         return () => {
             window.removeEventListener( `keydown`, on_key )
+            commit_ref.current?.()
+            mark_unsaved( id, false )
             previous?.focus?.()
         }
-    }, [ on_close ] )
-
-    const save_recur = () => {
-        const text = recur_input.trim()
-        if( !text ) return save( { recur: null } )
-        const { task: parsed } = parse_quick_add( `x ${ text.startsWith( `every` ) ? text : `every ${ text }` }`, { today } )
-        save( { recur: parsed.recur || { raw: text, unparsed: true } } )
-    }
-
-    const save_labels = () => {
-        const names = label_input.split( `,` ).map( name => name.trim().replace( /^@/, `` ) ).filter( Boolean )
-        set_labels( store, task.id, names )
-    }
+    }, [ on_close, id, mark_unsaved ] )
 
     const add_sub = event => {
         event.preventDefault()
@@ -107,7 +143,8 @@ export default function TaskDetail( { task, on_close } ) {
     const remove = async () => {
         delete_task( store, task.id )
         on_close()
-        await flush()
+        const saved = await flush().then( () => true, () => false )
+        if( !saved ) return
         toast( t => <span>Deleted “{ task.title }” <button onClick={ () => {
             restore_task( store, task.id )
             toast.dismiss( t.id )
@@ -122,13 +159,13 @@ export default function TaskDetail( { task, on_close } ) {
 
         <input className="title" value={ title } aria-label="Title"
             onChange={ ( { target: { value } } ) => set_title( value ) }
-            onBlur={ () => title.trim() && title !== task.title && save( { title: title.trim() } ) }
+            onBlur={ save_title }
             onKeyDown={ event => event.key === `Enter` && event.currentTarget.blur() }
         />
 
         <textarea className="notes" value={ notes } placeholder="Notes" aria-label="Notes"
             onChange={ ( { target: { value } } ) => set_notes( value ) }
-            onBlur={ () => notes !== ( task.notes || `` ) && save( { notes } ) }
+            onBlur={ save_notes }
         />
 
         <dl>
@@ -168,7 +205,7 @@ export default function TaskDetail( { task, on_close } ) {
 
         <h3>Subtasks</h3>
         <div className="subs">
-            { subtasks.map( sub => <TaskCard key={ sub.id } task={ sub } today={ today } /> ) }
+            { subtasks.map( sub => <TaskCard key={ sub.id } task={ sub } today={ today } on_complete={ on_complete } on_open={ on_open } /> ) }
             <form onSubmit={ add_sub }>
                 <input value={ sub_text } placeholder="Add subtask" aria-label="Add subtask" onChange={ ( { target: { value } } ) => set_sub_text( value ) } />
             </form>

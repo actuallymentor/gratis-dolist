@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -10,6 +10,11 @@ import TaskCard from '../molecules/TaskCard'
 import TaskList from '../molecules/TaskList'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { open_tasks } from '../../modules/selectors'
+
+// Cards rendered per lane before "Show more": keeps 10k-task boards light (plan §5)
+const PAGE = 50
+
+const OUTSIDE = { id: `outside`, name: `No date` }
 
 const Board = styled.div`
     display: grid; grid-template-columns: repeat( 4, minmax( 0, 1fr ) ); gap: 1rem; align-items: start;
@@ -30,17 +35,19 @@ const Lane = styled.section`
     h2 span { color: var(--faint); font-weight: 500; font-variant-numeric: tabular-nums }
     .empty { color: var(--faint); font-size: .85rem; padding: .25rem }
     .refusal { color: var(--bad); font-size: .8rem; padding: 0 .25rem }
+    .more { all: unset; cursor: pointer; min-height: 44px; text-align: center; color: var(--muted); font-size: .88rem; border-radius: var(--radius-sm) }
+    .more:hover, .more:focus-visible { background: var(--surface); color: var(--fg) }
 `
 
 const Mover = styled.div`
-    position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: #1a1a2e33;
+    position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 1rem; background: #1a1a2e33;
 
-    [role="menu"] { background: var(--surface); border-radius: var(--radius); padding: .5rem; min-width: 16rem; box-shadow: 0 12px 32px #0003 }
-    p { color: var(--muted); font-size: .85rem; padding: .35rem .6rem }
-    button { all: unset; display: flex; justify-content: space-between; width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 .75rem; border-radius: var(--radius-sm); cursor: pointer }
+    [role="menu"] { background: var(--surface); border-radius: var(--radius); padding: .5rem; min-width: min( 18rem, 100% ); box-shadow: 0 12px 32px #0003 }
+    p { color: var(--muted); font-size: .85rem; padding: .35rem .6rem; overflow-wrap: anywhere }
+    button { all: unset; display: flex; justify-content: space-between; gap: 1rem; width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 .75rem; border-radius: var(--radius-sm); cursor: pointer }
     button:hover, button:focus-visible { background: var(--accent-tint) }
     button[aria-disabled="true"] { color: var(--faint); cursor: not-allowed }
-    small { color: var(--bad) }
+    small { color: var(--bad); text-align: right }
 `
 
 const Outside = styled.details`
@@ -53,7 +60,7 @@ const Outside = styled.details`
 
 /**
  * Horizons: the default recipe (rolling lanes, each task once by its soonest date).
- * Reschedule by dragging (live accept/refuse preview) or with the Move command (focus a card, press M).
+ * Reschedule by dragging (live accept/refuse preview), the card's Move button, or M on a focused card.
  */
 export default function HorizonsPage() {
 
@@ -68,6 +75,8 @@ export default function HorizonsPage() {
     const [ dragging, set_dragging ] = useState( null )
     const [ over, set_over ] = useState( null )
     const [ moving, set_moving ] = useState( null )
+    const [ shown, set_shown ] = useState( {} )
+    const [ outside_open, set_outside_open ] = useState( false )
 
     const try_move = ( task, lane ) => {
         const result = move( task, lane.id, recipe, ctx )
@@ -76,11 +85,20 @@ export default function HorizonsPage() {
         toast( `Moved to ${ lane.name }` )
     }
 
-    // Live preview: what would happen if dropped here
-    const verdict_of = lane => dragging ? move( dragging, lane.id, recipe, ctx ) : null
+    // Stable handlers so memoized cards don't re-render on every drag frame
+    const on_move = useCallback( task => set_moving( task ), [] )
+    const on_drag_start = useCallback( event => {
+        const card = event.currentTarget
+        const task = tasks.find( ( { id } ) => id === card.dataset.taskId )
+        event.dataTransfer.effectAllowed = `move`
+        event.dataTransfer.setData( `text/plain`, card.dataset.taskId )
+        set_dragging( task )
+    }, [ tasks ] )
 
-    const on_board_key = event => {
-        if( event.key.toLowerCase() !== `m` || event.metaKey || event.ctrlKey ) return
+    // M on any focused card (board or outside list) opens the Move command
+    const on_page_key = event => {
+        if( event.key.toLowerCase() !== `m` || event.metaKey || event.ctrlKey || event.altKey ) return
+        if( /input|textarea|select/i.test( event.target.tagName ) ) return
         const card = event.target.closest?.( `[data-task-id]` )
         const task = card && tasks.find( ( { id } ) => id === card.dataset.taskId )
         if( !task ) return
@@ -88,48 +106,55 @@ export default function HorizonsPage() {
         set_moving( task )
     }
 
-    return <Page title="Horizons" wide>
-        <Board onKeyDown={ on_board_key }>
-            { lanes.map( lane => {
-                const verdict = over === lane.id ? verdict_of( lane ) : null
-                return <Lane key={ lane.id } aria-label={ lane.name }
-                    data-drop={ verdict ? verdict.refused ? `refused` : `ok` : undefined }
-                    onDragOver={ event => {
-                        event.preventDefault()
-                        set_over( lane.id )
-                    } }
-                    onDragLeave={ event => !event.currentTarget.contains( event.relatedTarget ) && set_over( null ) }
-                    onDrop={ event => {
-                        event.preventDefault()
-                        if( dragging ) try_move( dragging, lane )
-                        set_dragging( null )
-                        set_over( null )
-                    } }
-                >
-                    <h2>{ lane.name } <span>{ lane.tasks.length }</span></h2>
-                    { verdict?.refused && <p className="refusal" role="status">{ verdict.reason }</p> }
-                    { lane.tasks.map( task => <TaskCard key={ task.id } task={ task } today={ today } draggable
-                        on_complete={ on_complete } on_open={ on_open }
-                        on_drag_start={ event => {
-                            event.dataTransfer.effectAllowed = `move`
-                            event.dataTransfer.setData( `text/plain`, task.id )
-                            set_dragging( task )
-                        } }
-                    /> ) }
-                    { !lane.tasks.length && <p className="empty">Nothing here.</p> }
-                </Lane>
-            } ) }
-        </Board>
+    const verdict_of = lane => dragging ? move( dragging, lane.id, recipe, ctx ) : null
 
-        { !!outside.length && <Outside>
-            <summary><ChevronDown size={ 16 } aria-hidden /> Outside this view ({ outside.length })</summary>
-            <TaskList tasks={ outside } today={ today } on_complete={ on_complete } on_open={ on_open } />
-        </Outside> }
+    return <div onKeyDown={ on_page_key }>
+        <Page title="Horizons" wide>
+            <Board>
+                { lanes.map( lane => {
+                    const verdict = over === lane.id ? verdict_of( lane ) : null
+                    const limit = shown[ lane.id ] || PAGE
+                    return <Lane key={ lane.id } aria-label={ lane.name }
+                        data-drop={ verdict ? verdict.refused ? `refused` : `ok` : undefined }
+                        onDragOver={ event => {
+                            event.preventDefault()
+                            if( over !== lane.id ) set_over( lane.id )
+                        } }
+                        onDragLeave={ event => !event.currentTarget.contains( event.relatedTarget ) && set_over( null ) }
+                        onDragEnd={ () => {
+                            set_dragging( null )
+                            set_over( null )
+                        } }
+                        onDrop={ event => {
+                            event.preventDefault()
+                            if( dragging ) try_move( dragging, lane )
+                            set_dragging( null )
+                            set_over( null )
+                        } }
+                    >
+                        <h2>{ lane.name } <span>{ lane.tasks.length }</span></h2>
+                        { verdict?.refused && <p className="refusal" role="status">{ verdict.reason }</p> }
+                        { lane.tasks.slice( 0, limit ).map( task => <TaskCard key={ task.id } task={ task } today={ today } draggable
+                            on_complete={ on_complete } on_open={ on_open } on_move={ on_move } on_drag_start={ on_drag_start }
+                        /> ) }
+                        { lane.tasks.length > limit && <button className="more" onClick={ () => set_shown( { ...shown, [ lane.id ]: limit + PAGE * 4 } ) }>
+                            Show { Math.min( PAGE * 4, lane.tasks.length - limit ) } more
+                        </button> }
+                        { !lane.tasks.length && <p className="empty">Nothing here.</p> }
+                    </Lane>
+                } ) }
+            </Board>
+
+            { !!outside.length && <Outside onToggle={ event => set_outside_open( event.currentTarget.open ) }>
+                <summary><ChevronDown size={ 16 } aria-hidden /> Outside this view ({ outside.length })</summary>
+                { outside_open && <TaskList tasks={ outside.slice( 0, shown.outside || PAGE * 4 ) } today={ today } on_complete={ on_complete } on_open={ on_open } on_move={ on_move } /> }
+            </Outside> }
+        </Page>
 
         { moving && <Mover onClick={ () => set_moving( null ) } onKeyDown={ event => event.key === `Escape` && set_moving( null ) }>
             <div role="menu" aria-label={ `Move ${ moving.title }` } onClick={ event => event.stopPropagation() }>
                 <p>Move “{ moving.title }” to…</p>
-                { lanes.map( ( lane, index ) => {
+                { [ ...lanes, OUTSIDE ].map( ( lane, index ) => {
                     const verdict = move( moving, lane.id, recipe, ctx )
                     return <button key={ lane.id } role="menuitem" autoFocus={ index === 0 } aria-disabled={ !!verdict.refused }
                         onClick={ () => {
@@ -143,5 +168,5 @@ export default function HorizonsPage() {
                 } ) }
             </div>
         </Mover> }
-    </Page>
+    </div>
 }

@@ -9,9 +9,12 @@ const export_path = new URL( `../../../fixtures/private/todoist-export.json`, im
 
 const PROTECTED_RX = /\[[^\]\n]*\]\([^)\s]*\)|\b[a-z][a-z0-9+.-]*:\/\/\S+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gi
 
-describe.skipIf( !existsSync( corpus_path ) )( `corpus: zero title corruption`, () => {
+// skipIf still runs this callback at collection: read the fixture only when it exists
+const has_corpus = existsSync( corpus_path )
 
-    const rows = JSON.parse( readFileSync( corpus_path, `utf8` ) )
+describe.skipIf( !has_corpus )( `corpus: zero title corruption`, () => {
+
+    const rows = has_corpus ? JSON.parse( readFileSync( corpus_path, `utf8` ) ) : []
     const account = existsSync( export_path ) ? JSON.parse( readFileSync( export_path, `utf8` ) ) : { projects: [], labels: [] }
     const options = { today: `2026-11-24`, projects: account.projects.map( ( { name } ) => name ), labels: account.labels.map( ( { name } ) => name ) }
     const results = rows.map( ( { content }, index ) => ( { index, content, ...parse_quick_add( content, options ) } ) )

@@ -79,12 +79,22 @@ const membership_index = store => {
     return index
 }
 
+// Task cells a Todoist import owns: empty upstream clears them locally on re-import
+const MANAGED = [ `notes`, `project_id`, `parent_id`, `priority`, `scheduled`, `time`, `tz`, `duration`, `deadline`, `recur`, `completed_at` ]
+
+// Upserts a row; managed cells absent from `cells` are cleared (an empty cell is an absent cell)
+const upsert = ( store, table_id, id, cells, managed ) => {
+    store.setPartialRow( table_id, id, cells )
+    managed.filter( cell => !( cell in cells ) && store.hasCell( table_id, id, cell ) ).forEach( cell => store.delCell( table_id, id, cell ) )
+}
+
 /**
- * Imports core `from_todoist` output, batched. Idempotent: rows carry `todoist_id`, re-import updates them in place.
- * Expected shape (references by name, ids are Todoist's):
- *   projects: [ { todoist_id, name, color?, parent? (project name) } ]
+ * Imports core `from_todoist` output, batched. Idempotent: rows carry `todoist_id`, re-import updates them in place
+ * and clears managed cells that are now empty upstream. References resolve by Todoist id only (same-named projects
+ * stay apart); name fields like `project` / `parent` are ignored.
+ *   projects: [ { todoist_id, name, color?, parent_todoist_id? } ]
  *   labels:   [ { todoist_id?, name, color? } ]
- *   tasks:    [ { todoist_id, title, project? (name, unknown = Inbox), labels? (names), parent_todoist_id?, ...task cells } ]
+ *   tasks:    [ { todoist_id, title, project_todoist_id? (unknown = Inbox), labels? (names), parent_todoist_id?, ...task cells } ]
  * @param {Object} store
  * @param {{ projects?: Array, labels?: Array, tasks?: Array }} data
  * @returns {Promise<{ projects: number, labels: number, tasks: number, created: number, updated: number }>}
@@ -96,20 +106,20 @@ export const import_todoist = async ( store, { projects = [], labels = [], tasks
     const task_ids = todoist_index( store, `tasks` )
     const label_ids = todoist_index( store, `labels` )
 
+    // Todoist id → local row id (undefined id or unknown row = none)
+    const local_id = ( index, todoist_id ) => todoist_id === undefined || todoist_id === null ? undefined : index.get( `${ todoist_id }` )
+
     // Projects + labels are few: one transaction
     store.transaction( () => {
 
-        const rows = projects.map( ( { todoist_id, parent, ...fields } ) => {
-            const id = project_ids.get( `${ todoist_id }` ) ?? uuid()
-            project_ids.set( `${ todoist_id }`, id )
-            store.setPartialRow( `projects`, id, { created_at: now, ...to_cells( fields ), todoist_id: `${ todoist_id }` } )
-            return { id, parent }
-        } )
+        // Assign ids first so parents resolve regardless of order
+        projects.forEach( ( { todoist_id } ) => project_ids.set( `${ todoist_id }`, local_id( project_ids, todoist_id ) ?? uuid() ) )
 
-        // Parents by name, once all projects exist
-        rows.filter( ( { parent } ) => parent ).forEach( ( { id, parent } ) => {
-            const parent_id = rows.find( row => store.getCell( `projects`, row.id, `name` ) === parent )?.id
-            if( parent_id ) store.setCell( `projects`, id, `parent_id`, parent_id )
+        projects.forEach( ( { todoist_id, parent, parent_todoist_id, ...fields } ) => {
+            const id = local_id( project_ids, todoist_id )
+            const created_at = store.getCell( `projects`, id, `created_at` ) ?? now
+            const parent_id = local_id( project_ids, parent_todoist_id )
+            upsert( store, `projects`, id, { created_at, ...to_cells( { ...fields, parent_id } ), todoist_id: `${ todoist_id }` }, [ `parent_id` ] )
         } )
 
         labels.forEach( ( { todoist_id, ...fields } ) => {
@@ -118,14 +128,6 @@ export const import_todoist = async ( store, { projects = [], labels = [], tasks
         } )
 
     } )
-
-    // Project names → ids (imported first, then any existing live project)
-    const project_by_name = new Map()
-    store.forEachRow( `projects`, id => {
-        const name = store.getCell( `projects`, id, `name` )
-        if( !store.getCell( `projects`, id, `deleted_at` ) && !project_by_name.has( name ) ) project_by_name.set( name, id )
-    } )
-    project_ids.forEach( id => project_by_name.set( store.getCell( `projects`, id, `name` ), id ) )
 
     // Assign ids up front so subtasks resolve parents regardless of order
     const created = tasks.filter( ( { todoist_id } ) => !task_ids.has( `${ todoist_id }` ) ).length
@@ -138,16 +140,16 @@ export const import_todoist = async ( store, { projects = [], labels = [], tasks
 
     const memberships = membership_index( store )
 
-    await in_batches( store, tasks, ( { todoist_id, project, labels: names = [], parent_todoist_id, ...fields } ) => {
+    await in_batches( store, tasks, ( { todoist_id, project, project_todoist_id, labels: names = [], parent_todoist_id, ...fields } ) => {
 
         const id = task_ids.get( `${ todoist_id }` )
-        const project_id = project_by_name.get( project )
-        const parent_id = parent_todoist_id !== undefined ? task_ids.get( `${ parent_todoist_id }` ) : undefined
+        const project_id = local_id( project_ids, project_todoist_id )
+        const parent_id = local_id( task_ids, parent_todoist_id )
+        const created_at = store.getCell( `tasks`, id, `created_at` ) ?? now
 
-        store.setPartialRow( `tasks`, id, { created_at: now, ...to_cells( { ...fields, project_id, parent_id } ), todoist_id: `${ todoist_id }` } )
+        upsert( store, `tasks`, id, { created_at, ...to_cells( { ...fields, project_id, parent_id } ), todoist_id: `${ todoist_id }` }, MANAGED )
         write_labels( store, id, names.map( name => label_by_name.get( name ) ), memberships.get( id ) ?? [] )
     } )
 
     return { projects: projects.length, labels: new Set( [ ...labels.map( ( { name } ) => name ), ...label_names ] ).size, tasks: tasks.length, created, updated: tasks.length - created }
 }
-

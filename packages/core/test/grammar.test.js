@@ -134,6 +134,15 @@ describe( `literals and masking`, () => {
         expect( task_of( `Buy 12" monitor` ).title ).toBe( `Buy 12" monitor` )
     } )
 
+    it( `quotes claim before project, label, date and priority rules`, () => {
+        const nothing = { project: null, labels: [], scheduled: null, deadline: null, priority: null }
+        expect( task_of( `Read "call #home today"` ) ).toMatchObject( { ...nothing, title: `Read call #home today` } )
+        expect( task_of( `Read "by fri @calls" book` ) ).toMatchObject( { ...nothing, title: `Read by fri @calls book` } )
+        expect( task_of( `Read "ask @Bob tomorrow"`, { labels: [ `Bob` ] } ) ).toMatchObject( { ...nothing, title: `Read ask @Bob tomorrow` } )
+        expect( task_of( `Read "#Errands p1" today` ) ).toMatchObject( { title: `Read #Errands p1`, project: null, priority: null, scheduled: today } )
+        expect( parse( `Read "call #home today"` ).spans.map( ( { type } ) => type ) ).toEqual( [ `literal` ] )
+    } )
+
     it( `handles curly and unclosed quotes`, () => {
         expect( task_of( `Sing “every day” song` ).title ).toBe( `Sing every day song` )
         expect( task_of( `Sing "every day` ) ).toMatchObject( { title: `Sing every day`, recur: null } )

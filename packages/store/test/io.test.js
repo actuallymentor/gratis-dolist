@@ -45,16 +45,16 @@ describe( `export_json / import_json`, () => {
 describe( `import_todoist`, () => {
 
     const todoist = {
-        projects: [ { todoist_id: `p1`, name: `Work` }, { todoist_id: `p2`, name: `Reports`, parent: `Work`, color: `red` } ],
+        projects: [ { todoist_id: `p1`, name: `Work` }, { todoist_id: `p2`, name: `Reports`, parent_todoist_id: `p1`, color: `red` } ],
         labels: [ { todoist_id: `l1`, name: `deep` } ],
         tasks: [
-            { todoist_id: `t2`, title: `Sub`, parent_todoist_id: `t1`, project: `Reports` },
-            { todoist_id: `t1`, title: `Q4 report`, project: `Reports`, labels: [ `deep`, `urgent` ], priority: 1, scheduled: `2026-11-27`, deadline: `2026-11-30` },
-            { todoist_id: `t3`, title: `Weird`, recur: `every 3rd tue`, project: `Inbox` },
+            { todoist_id: `t2`, title: `Sub`, parent_todoist_id: `t1`, project_todoist_id: `p2` },
+            { todoist_id: `t1`, title: `Q4 report`, project_todoist_id: `p2`, labels: [ `deep`, `urgent` ], priority: 1, scheduled: `2026-11-27`, deadline: `2026-11-30` },
+            { todoist_id: `t3`, title: `Weird`, recur: `every 3rd tue`, project_todoist_id: `inbox` },
         ],
     }
 
-    it( `maps names to ids, subtasks, labels, unparsed recurrence`, async () => {
+    it( `maps todoist ids to ids, subtasks, labels, unparsed recurrence`, async () => {
         const store = memory()
         expect( await import_todoist( store, todoist ) ).toEqual( { projects: 2, labels: 2, tasks: 3, created: 3, updated: 0 } )
 
@@ -78,6 +78,38 @@ describe( `import_todoist`, () => {
         expect( get_projects( store ) ).toHaveLength( 2 )
         expect( get_labels( store ) ).toHaveLength( 2 )
         expect( get_tasks( store ).find( t => t.todoist_id === `t1` ) ).toMatchObject( { title: `Q4 report v2`, labels: [ `deep` ] } )
+    } )
+
+    it( `keeps same-named projects apart (parents and tasks resolve by todoist id)`, async () => {
+        const store = memory()
+        await import_todoist( store, {
+            projects: [ { todoist_id: `a`, name: `Admin` }, { todoist_id: `b`, name: `Admin` }, { todoist_id: `c`, name: `Sub`, parent_todoist_id: `b` } ],
+            tasks: [ { todoist_id: `x`, title: `In B`, project_todoist_id: `b` } ],
+        } )
+
+        const by_todoist = Object.fromEntries( get_projects( store ).map( project => [ project.todoist_id, project ] ) )
+        expect( by_todoist.a.id ).not.toBe( by_todoist.b.id )
+        expect( by_todoist.c.parent_id ).toBe( by_todoist.b.id )
+        expect( get_tasks( store )[ 0 ].project_id ).toBe( by_todoist.b.id )
+    } )
+
+    it( `re-import clears cells that are now empty upstream`, async () => {
+        const store = memory()
+        await import_todoist( store, todoist )
+
+        // Upstream: Q4 report lost its dates, priority and project, Sub its parent, Reports its parent
+        const bare = { todoist_id: `t1`, title: `Q4 report`, labels: [ `deep` ] }
+        const flat_projects = [ { todoist_id: `p1`, name: `Work` }, { todoist_id: `p2`, name: `Reports` } ]
+        await import_todoist( store, { projects: flat_projects, tasks: [ { ...bare, completed_at: 5 }, { todoist_id: `t2`, title: `Sub` } ] } )
+
+        // Then reopened upstream
+        await import_todoist( store, { tasks: [ bare ] } )
+
+        const by_title = Object.fromEntries( get_tasks( store ).map( t => [ t.title, t ] ) )
+        const cleared = [ `priority`, `scheduled`, `deadline`, `project_id`, `completed_at` ]
+        cleared.forEach( cell => expect( by_title[ `Q4 report` ] ).not.toHaveProperty( cell ) )
+        expect( by_title.Sub ).not.toHaveProperty( `parent_id` )
+        expect( get_projects( store ).find( project => project.name === `Reports` ) ).not.toHaveProperty( `parent_id` )
     } )
 
 } )

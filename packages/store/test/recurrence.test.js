@@ -33,12 +33,43 @@ describe( `recurring completion via core`, () => {
         expect( get_task( store, id ) ).toMatchObject( { scheduled: `2026-11-24`, deadline: `2026-11-26`, completions: [] } )
     } )
 
-    it( `keeps unparsed rules in place`, () => {
+    it( `completes unparsed rules like one-offs, undo reopens`, () => {
         const store = make()
         const id = add_task( store, { title: `Odd`, recur: `every 3rd tue`, scheduled: `2026-11-24` } )
-        expect( complete_task( store, id, { today: `2026-11-24` } ) ).toBe( `2026-11-24` )
-        expect( get_task( store, id ) ).toMatchObject( { scheduled: `2026-11-24`, completions: [ { occurrence: `2026-11-24` } ] } )
+        expect( complete_task( store, id, { today: `2026-11-24` } ) ).toBe( null )
+        expect( get_task( store, id ) ).toMatchObject( { scheduled: `2026-11-24`, completed_at: expect.any( Number ) } )
+        expect( store.getRowCount( `completions` ) ).toBe( 0 )
+
+        uncomplete_task( store, id )
         expect( get_task( store, id ) ).not.toHaveProperty( `completed_at` )
+    } )
+
+    it( `undo moves a deadline-only series back`, () => {
+        const store = make()
+        const id = add_task( store, { title: `Taxes`, recur: weekly, deadline: `2026-11-24` } )
+        complete_task( store, id, { today: `2026-11-24` } )
+        expect( get_task( store, id ).deadline ).toBe( `2026-12-01` )
+
+        uncomplete_task( store, id )
+        expect( get_task( store, id ) ).toMatchObject( { deadline: `2026-11-24`, completions: [] } )
+        expect( get_task( store, id ) ).not.toHaveProperty( `scheduled` )
+    } )
+
+    it( `resets completed subtasks per occurrence, undo restores them`, () => {
+        const store = make()
+        const id = add_task( store, { title: `Clean`, recur: weekly, scheduled: `2026-11-24` } )
+        const done = add_task( store, { title: `Hoover`, parent_id: id } )
+        const open = add_task( store, { title: `Mop`, parent_id: id } )
+        complete_task( store, done )
+        const done_at = store.getCell( `tasks`, done, `completed_at` )
+
+        complete_task( store, id, { today: `2026-11-24` } )
+        expect( get_task( store, done ) ).not.toHaveProperty( `completed_at` )
+        expect( get_task( store, open ) ).not.toHaveProperty( `completed_at` )
+
+        uncomplete_task( store, id )
+        expect( get_task( store, done ).completed_at ).toBe( done_at )
+        expect( get_task( store, open ) ).not.toHaveProperty( `completed_at` )
     } )
 
 } )

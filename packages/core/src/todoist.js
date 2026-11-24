@@ -1,5 +1,6 @@
 // Todoist export (API v1 shapes) → Dolist rows. Pure: no network, no ids minted.
-// Output matches @dolist/store's import_todoist: Todoist ids as todoist_id, projects/labels referenced by name,
+// Output matches @dolist/store's import_todoist: Todoist ids as todoist_id, projects referenced by Todoist id
+// (names ride along for display only; same-named projects are distinct), labels by name,
 // the Todoist Inbox becomes "no project".
 
 import { wall_clock } from './dates.js'
@@ -38,8 +39,8 @@ const minutes_of = duration => {
  * @param {{ projects?: object[], labels?: object[], tasks?: object[], completed?: object[] }} export_json - raw API v1 lists
  * @param {{ include_completed?: boolean }} [options]
  * @returns {{ projects: object[], labels: object[], tasks: object[] }}
- *   project = { todoist_id, name, color?, parent? (name) }   label = { todoist_id, name }
- *   task = { todoist_id, title, notes, project? (name), parent_todoist_id?, labels: [names], priority, scheduled, time, tz, duration, deadline, recur, created_at? (ms), completed_at (ms|null) }
+ *   project = { todoist_id, name, color?, parent_todoist_id?, parent? (name, display only) }   label = { todoist_id, name }
+ *   task = { todoist_id, title, notes, project_todoist_id?, project? (name, display only), parent_todoist_id?, labels: [names], priority, scheduled, time, tz, duration, deadline, recur, created_at? (ms), completed_at (ms|null) }
  *   recur = parsed rule anchored to the due date, or { raw, unparsed: true } (kept verbatim, never dropped)
  */
 export const from_todoist = ( export_json, { include_completed = true } = {} ) => {
@@ -53,13 +54,16 @@ export const from_todoist = ( export_json, { include_completed = true } = {} ) =
     const name_of = new Map( live_projects.map( project => [ project.id, project.name ] ) )
     const project_name_of = id => id && !inbox_ids.has( id ) ? name_of.get( id ) : undefined
 
+    // Live, non-Inbox project ids only: a reference to anything else means "no project"
+    const project_ref = id => project_name_of( id ) !== undefined ? id : undefined
+
     const projects = live_projects
         .filter( project => !inbox_ids.has( project.id ) )
         .map( project => ( {
             todoist_id: project.id,
             name: project.name,
             ...project.color && { color: project.color },
-            ...project_name_of( project.parent_id ) && { parent: project_name_of( project.parent_id ) },
+            ...project_ref( project.parent_id ) && { parent_todoist_id: project.parent_id, parent: project_name_of( project.parent_id ) },
         } ) )
 
     // Active wins over a completed copy of the same id
@@ -76,7 +80,7 @@ export const from_todoist = ( export_json, { include_completed = true } = {} ) =
             todoist_id: task.id,
             title: task.content ?? ``,
             notes: task.description ?? ``,
-            ...project_name_of( task.project_id ) && { project: project_name_of( task.project_id ) },
+            ...project_ref( task.project_id ) && { project_todoist_id: task.project_id, project: project_name_of( task.project_id ) },
             ...task.parent_id && { parent_todoist_id: task.parent_id },
             labels: [ ...task.labels || [] ],
             priority: PRIORITY[ task.priority ] ?? null,

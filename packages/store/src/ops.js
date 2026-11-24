@@ -89,6 +89,15 @@ export const set_labels = ( store, id, names ) => store.transaction( () => {
 // Tasks
 // /////////////////////////////*/
 
+// Live subtasks of a task; scans, fine for single edits
+const children_of = ( store, id ) => store.getRowIds( `tasks` ).filter( child_id => store.getCell( `tasks`, child_id, `parent_id` ) === id && !store.getCell( `tasks`, child_id, `deleted_at` ) )
+
+// Writes a patch: empty values clear the cell, objects become JSON
+const write_cells = ( store, id, patch ) => Object.entries( patch ).forEach( ( [ cell, value ] ) => {
+    if( is_empty( value ) ) store.delCell( `tasks`, id, cell )
+    else store.setCell( `tasks`, id, cell, to_cell( value ) )
+} )
+
 /**
  * Adds a task.
  * @param {Object} store
@@ -126,22 +135,27 @@ export const update_task = ( store, id, patch ) => {
     const fields = Object.entries( patch ).filter( ( [ key ] ) => !DERIVED.includes( key ) )
 
     store.transaction( () => {
-        fields.forEach( ( [ cell, value ] ) => {
-            if( is_empty( value ) ) store.delCell( `tasks`, id, cell )
-            else store.setCell( `tasks`, id, cell, to_cell( value ) )
-        } )
+        write_cells( store, id, Object.fromEntries( fields ) )
         if( labels ) set_labels( store, id, labels )
     } )
     return true
 }
 
 /**
- * Tombstones a task (plan §2.2: delete = tombstone, never pruned in v1).
+ * Tombstones a task (plan §2.2: delete = tombstone, never pruned in v1). Live subtasks are orphaned into the
+ * parent's project (parent_id cleared); restore_task does not re-parent them.
  * @param {Object} store
  * @param {string} id
  */
 export const delete_task = ( store, id ) => {
-    if( store.hasRow( `tasks`, id ) && !store.getCell( `tasks`, id, `deleted_at` ) ) store.setCell( `tasks`, id, `deleted_at`, now_of( store ) )
+
+    if( !store.hasRow( `tasks`, id ) || store.getCell( `tasks`, id, `deleted_at` ) ) return
+    const project_id = store.getCell( `tasks`, id, `project_id` )
+
+    store.transaction( () => {
+        store.setCell( `tasks`, id, `deleted_at`, now_of( store ) )
+        children_of( store, id ).forEach( child_id => write_cells( store, child_id, { parent_id: null, project_id } ) )
+    } )
 }
 
 /**
@@ -170,9 +184,10 @@ const add_days = ( iso, days ) => new Date( Date.parse( iso ) + days * DAY_MS ).
 const completion_keys_of = ( store, id ) => store.getRowIds( `completions` ).filter( key => split_key( key )[ 0 ] === id )
 
 /**
- * Completes a task. Non-recurring → completed_at. Recurring → a `completions` row keyed `task:occurrence`
- * (idempotent: two devices completing the same occurrence offline write the same key) and, via core's
- * complete_patch, scheduled/deadline move to the next occurrence.
+ * Completes a task. Non-recurring (or an unparsed rule) → completed_at. Recurring → a `completions` row keyed
+ * `task:occurrence` (idempotent: two devices completing the same occurrence offline write the same key), core's
+ * complete_patch moves scheduled/deadline to the next occurrence, and completed subtasks reset for it (plan §2.3;
+ * the row's `reset` cell remembers them for undo).
  * @param {Object} store
  * @param {string} id
  * @param {Object} [options]
@@ -197,24 +212,35 @@ export const complete_task = ( store, id, { today, occurrence, skipped = false }
     const lib = recurrence()
     const date = occurrence ?? lib?.current_occurrence( task, done, today ) ?? row.scheduled ?? today
 
+    // Core treats an unparsed rule as a one-off: its patch is { completed_at }, no completion row.
+    // Empty patch values (no next occurrence) leave cells alone
+    const { patch = {}, completion } = lib?.complete_patch( task, date, today, { skipped, at } ) ?? { completion: true }
+    if( !completion ) {
+        store.transaction( () => write_cells( store, id, to_cells( patch ) ) )
+        return null
+    }
+
     // Already completed on this or another device: nothing to do
     const key = pair_key( id, date )
     if( store.hasRow( `completions`, key ) ) return date
 
-    store.transaction( () => {
-        store.setRow( `completions`, key, to_cells( { at, skipped } ) )
+    // Subtasks reset per occurrence: child id → its completed_at, so undo can put them back
+    const reset = Object.fromEntries( children_of( store, id )
+        .map( child_id => [ child_id, store.getCell( `tasks`, child_id, `completed_at` ) ] )
+        .filter( ( [ , completed_at ] ) => completed_at ) )
 
-        // Advance dates only (unparsed rules get a completion row but stay put)
-        const { patch = {} } = lib?.complete_patch( task, date, today, { skipped, at } ) ?? {}
-        const moves = [ `scheduled`, `deadline` ].filter( field => patch[ field ] )
-        moves.forEach( field => store.setCell( `tasks`, id, field, patch[ field ] ) )
+    store.transaction( () => {
+        store.setRow( `completions`, key, to_cells( { at, skipped, reset: Object.keys( reset ).length ? reset : null } ) )
+        write_cells( store, id, to_cells( patch ) )
+        Object.keys( reset ).forEach( child_id => store.delCell( `tasks`, child_id, `completed_at` ) )
     } )
     return date
 }
 
 /**
- * Reopens a task. Recurring: deletes the given occurrence's completion (default: most recent) and, if the
- * task had advanced past it, moves scheduled (and deadline, same offset) back to that occurrence.
+ * Reopens a task. Non-recurring (or completed_at set): clears completed_at. Recurring: deletes the given
+ * occurrence's completion (default: most recent), moves the series back to that occurrence if it had advanced
+ * past it (scheduled + deadline at the same offset, or deadline alone), and re-completes subtasks it had reset.
  * @param {Object} store
  * @param {string} id
  * @param {string} [occurrence]
@@ -222,10 +248,10 @@ export const complete_task = ( store, id, { today, occurrence, skipped = false }
 export const uncomplete_task = ( store, id, occurrence ) => {
 
     if( !store.hasRow( `tasks`, id ) ) return
-    const { recur, scheduled, deadline } = store.getRow( `tasks`, id )
+    const { recur, scheduled, deadline, completed_at } = store.getRow( `tasks`, id )
 
-    // Non-recurring: just clear the stamp
-    if( !recur ) {
+    // Non-recurring or unparsed rule: just clear the stamp
+    if( !recur || completed_at ) {
         store.delCell( `tasks`, id, `completed_at` )
         return
     }
@@ -236,11 +262,23 @@ export const uncomplete_task = ( store, id, occurrence ) => {
     if( !key || !store.hasRow( `completions`, key ) ) return
 
     const [ , date ] = split_key( key )
+    const reset = JSON.parse( store.getCell( `completions`, key, `reset` ) ?? `{}` )
+
+    // The series' date field (core advances scheduled, or deadline when there is no scheduled date)
+    const current = scheduled ?? deadline
+    const moves = !current || current <= date ? {} : {
+        ...scheduled ? { scheduled: date } : { deadline: date },
+        ...scheduled && deadline && { deadline: add_days( date, diff_days( deadline, scheduled ) ) },
+    }
+
     store.transaction( () => {
         store.delRow( `completions`, key )
-        if( !scheduled || scheduled <= date ) return
-        store.setCell( `tasks`, id, `scheduled`, date )
-        if( deadline ) store.setCell( `tasks`, id, `deadline`, add_days( date, diff_days( deadline, scheduled ) ) )
+        write_cells( store, id, moves )
+
+        // Put reset subtasks back, unless they were deleted or completed again since
+        Object.entries( reset )
+            .filter( ( [ child_id ] ) => store.hasRow( `tasks`, child_id ) && !store.getCell( `tasks`, child_id, `completed_at` ) )
+            .forEach( ( [ child_id, child_completed_at ] ) => store.setCell( `tasks`, child_id, `completed_at`, child_completed_at ) )
     } )
 }
 

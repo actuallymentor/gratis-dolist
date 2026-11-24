@@ -19,7 +19,9 @@ export const use_task_actions = () => {
     const on_complete = useCallback( async task => {
         // Recurring tasks return the completed occurrence, so Undo reopens exactly that one
         const occurrence = complete_task( store, task.id, { today } ) ?? undefined
-        await flush()
+        // Ack only once on disk; a failed save is reported by the global save-error toast
+        const saved = await flush().then( () => true, () => false )
+        if( !saved ) return
         toast( t => <span>
             Completed “{ task.title }”
             <button onClick={ () => {

@@ -103,12 +103,12 @@ test( `Horizons: keyboard Move command reschedules`, async ( { page } ) => {
     await page.goto( `/horizons` )
 
     const today_lane = page.getByRole( `region`, { name: `Today` } )
-    await expect( today_lane.getByRole( `button`, { name: `Plan trip` } ) ).toBeVisible()
+    await expect( today_lane.getByRole( `button`, { name: `Plan trip`, exact: true } ) ).toBeVisible()
 
-    await today_lane.getByRole( `button`, { name: `Plan trip` } ).focus()
+    await today_lane.getByRole( `button`, { name: `Plan trip`, exact: true } ).focus()
     await page.keyboard.press( `m` )
     await page.getByRole( `menuitem`, { name: /This month/ } ).click()
-    await expect( page.getByRole( `region`, { name: `This month` } ).getByRole( `button`, { name: `Plan trip` } ) ).toBeVisible()
+    await expect( page.getByRole( `region`, { name: `This month` } ).getByRole( `button`, { name: `Plan trip`, exact: true } ) ).toBeVisible()
 
 } )
 
@@ -150,4 +150,66 @@ test( `? opens the cheatsheet`, async ( { page } ) => {
     await expect( page.getByRole( `dialog`, { name: `Cheatsheet` } ) ).toBeVisible()
     await page.keyboard.press( `Escape` )
     await expect( page.getByRole( `dialog`, { name: `Cheatsheet` } ) ).toHaveCount( 0 )
+} )
+
+// ── Regressions from the M1 review ──────────────────────────────────────────
+
+test( `Escape keeps detail edits`, async ( { page } ) => {
+    await page.goto( `/inbox` )
+    await add( page, `Edit me` )
+    await page.getByRole( `button`, { name: `Edit me` } ).click()
+    const panel = page.getByRole( `dialog`, { name: /Task: Edit me/ } )
+    await panel.getByLabel( `Notes` ).fill( `typed then escaped` )
+    await page.keyboard.press( `Escape` )
+    await page.getByRole( `button`, { name: `Edit me` } ).click()
+    await expect( panel.getByLabel( `Notes` ) ).toHaveValue( `typed then escaped` )
+} )
+
+test( `confirming a new project and label assigns them`, async ( { page } ) => {
+    await page.goto( `/inbox` )
+    await quick_add( page ).fill( `Prune roses #Garden @outside` )
+    await quick_add( page ).press( `Enter` )
+    await quick_add( page ).press( `Enter` )
+    await expect( quick_add( page ) ).toHaveValue( `` )
+
+    // In a project, so it left the Inbox, and carries the label
+    await expect( page.getByRole( `button`, { name: `Prune roses` } ) ).toHaveCount( 0 )
+    await page.goto( `/search?q=roses` )
+    const card = page.locator( `[data-task-id]` ).filter( { hasText: `Prune roses` } )
+    await expect( card ).toContainText( `Garden` )
+    await expect( card ).toContainText( `outside` )
+} )
+
+test( `subtasks can be completed and opened from the parent`, async ( { page } ) => {
+    await page.goto( `/inbox` )
+    await add( page, `Parent task` )
+    await page.getByRole( `button`, { name: `Parent task` } ).click()
+    const panel = page.getByRole( `dialog`, { name: /Task: Parent task/ } )
+    await panel.getByLabel( `Add subtask` ).fill( `Child step` )
+    await panel.getByLabel( `Add subtask` ).press( `Enter` )
+    await panel.getByRole( `button`, { name: `Child step` } ).click()
+    await expect( page.getByRole( `dialog`, { name: /Task: Child step/ } ) ).toBeVisible()
+} )
+
+test( `Move button works without a keyboard, incl. to No date`, async ( { page } ) => {
+    await page.goto( `/inbox` )
+    await add( page, `Tap mover today` )
+    await page.goto( `/horizons` )
+    await page.getByRole( `button`, { name: `Move Tap mover` } ).click()
+    await page.getByRole( `menuitem`, { name: /No date/ } ).click()
+    await expect( page.getByRole( `region`, { name: `Today` } ).getByRole( `button`, { name: `Tap mover`, exact: true } ) ).toHaveCount( 0 )
+    await page.getByText( /Outside this view/ ).click()
+    await expect( page.getByRole( `button`, { name: `Tap mover`, exact: true } ) ).toBeVisible()
+} )
+
+test( `submitting in one tab keeps another tab's draft`, async ( { page, context } ) => {
+    await page.goto( `/inbox` )
+    const other = await context.newPage()
+    await other.goto( `/inbox` )
+    await quick_add( other ).fill( `draft in tab B` )
+    await add( page, `Submitted in tab A` )
+    await expect( page.getByRole( `button`, { name: `Submitted in tab A` } ) ).toBeVisible()
+    await page.waitForTimeout( 300 )
+    await other.reload()
+    await expect( quick_add( other ) ).toHaveValue( `draft in tab B` )
 } )

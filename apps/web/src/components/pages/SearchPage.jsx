@@ -25,7 +25,8 @@ export default function SearchPage() {
     const [ q, set_q ] = useQueryParam( `q`, withDefault( StringParam, `` ) )
 
     // tasks in deps: re-run when data changes
-    const results = useMemo( () => q.trim() ? search_tasks( store, q ) : [], [ store, q, tasks ] )
+    // Open tasks only: completed ones live in Completed (with Reopen)
+    const results = useMemo( () => q.trim() ? search_tasks( store, q ).filter( ( { completed_at, deleted_at } ) => !completed_at && !deleted_at ) : [], [ store, q, tasks ] )
 
     return <Page title="Search">
         <Field>
