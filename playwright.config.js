@@ -9,6 +9,7 @@ export default defineConfig( {
     projects: [
         { name: `desktop`, use: { ...devices[ `Desktop Chrome` ] } },
         { name: `phone`, use: { ...devices[ `Pixel 7` ] } },
+        { name: `iphone`, use: { ...devices[ `iPhone 15` ] } },
     ],
     webServer: {
         command: `npx wrangler dev --port 8787 --ip 127.0.0.1`,

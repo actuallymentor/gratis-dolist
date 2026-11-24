@@ -34,6 +34,13 @@ export default function SettingsPage() {
         apply_theme( value )
     }
 
+    // Refuses offline instead of discarding the working cached app
+    const [ update_note, set_update_note ] = useState( `Updates install automatically. Use this if something looks stale.` )
+    const update = async () => {
+        const updated = await hard_update()
+        if( !updated ) set_update_note( `You're offline. Try again once you're connected.` )
+    }
+
     return <Page title="Settings">
         <Rows>
             <label className="row">
@@ -47,9 +54,9 @@ export default function SettingsPage() {
             <div className="row">
                 <span>
                     Update app
-                    <small>Updates install automatically. Use this if something looks stale.</small>
+                    <small role="status">{ update_note }</small>
                 </span>
-                <button onClick={ hard_update }>
+                <button onClick={ update }>
                     <RefreshCw size={ 16 } strokeWidth={ 1.5 } aria-hidden /> Update
                 </button>
             </div>

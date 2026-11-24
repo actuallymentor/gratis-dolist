@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { hold_unsaved } from '../modules/unsaved'
 
 /**
  * UI-only state shared across components. Task data never lives here (plan §1: zustand for UI state only).
@@ -17,6 +18,7 @@ export const use_app_store = create( set => ( {
         const next = new Set( unsaved )
         if( dirty ) next.add( id )
         else next.delete( id )
+        hold_unsaved( next.size > 0 )
         return { unsaved: next }
     } ),
 } ) )
