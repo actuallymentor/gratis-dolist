@@ -52,6 +52,9 @@ test( `complete with undo, then reopen from history`, async ( { page } ) => {
     await page.getByRole( `button`, { name: `Undo` } ).click()
     await expect( page.getByRole( `button`, { name: `Water plants` } ) ).toBeVisible()
 
+    // Let the first ack leave, so the next wait proves the second completion's ack
+    await expect( page.getByText( `Completed “Water plants”` ) ).toHaveCount( 0 )
+
     await page.getByRole( `checkbox`, { name: `Complete Water plants` } ).click()
 
     // The toast is the durable ack: once it shows, a reload must keep the completion
