@@ -120,17 +120,18 @@ Each ends **deployed and used like a user** (real browser / real device). Main �
 
 | # | Milestone | Ships | Exit criteria |
 |---|---|---|---|
-| **M0** | Foundation + spikes | Monorepo, `.nvmrc`, airier lint, Vitest, Playwright, hardened CI (§6). Prod shows the **empty app shell** (brainstorm page gone). **Spike A, sync**: TinyBase on IndexedDB + expo-sqlite + DO with 10k tasks: hydration, save latency, kill-right-after-capture, two tabs, offline edits, clock skew. **Spike B, native**: signed dev build + `expo-widgets` small widget + `expo-app-intents` text intent on your real iPhone + Android via CI → LAN install; measure CI-to-device time. **Spike C, data**: read-only Todoist export of your account → grammar corpus + fixtures | Spike A meets budgets (§5) → TinyBase go/no-go. Spike B runs a widget on both phones. Corpus exists |
+| **M0** | Foundation + spikes | Monorepo, `.nvmrc`, airier lint, Vitest, Playwright, hardened CI (§6). Prod shows the **empty app shell** (brainstorm page gone). **Spike A, sync**: TinyBase on IndexedDB + DO with 10k tasks: hydration, save latency, kill-right-after-capture, two tabs, offline edits, clock skew. **Spike C, data**: read-only Todoist export of your account → grammar corpus + fixtures | Spike A meets budgets (§5) → TinyBase go/no-go. Corpus exists |
 | **M1** | Daily core (web, one device) | Durable capture (quick add, highlight, editable chips, "?" cheatsheet) → Inbox → **one Horizons recipe** → task detail (title, notes, both dates, time, priority, project, labels, recurrence, subtasks) → reschedule via **Move command** + drag with live preview → complete / undo → **search** (title + notes) → **completed history** with reopen → "Outside this view" list → export/import JSON. Minimal Todoist import (projects, labels, tasks, dates, deadlines, priority; unparsed recurrence kept verbatim). PWA: offline, deferred update activation, drafts persisted, install pill, build hash | One real week of use incl. offline. Playwright: full flow keyboard-only + pointer; upgrade test with an unsent draft |
 | **M2** | Sync + auth | Worker `/api` + `/sync` (DO per user), credentials + pairing (§4), revoke disconnects live sockets, nightly R2 snapshot + tested restore, multi-tab via BroadcastChannel | Two browsers + offline edits converge (real `wrangler dev`, `context.setOffline`); revoked device drops within seconds; snapshot restore verified |
-| **M3** | Capture anywhere | **Phone**: Expo app with capture sheet (accessory row `#` `@` `!` `by` 📅), Inbox, Today list, pairing. Small home widget + lock-screen accessory → capture sheet. App Intent "Add to Dolist" with text (Shortcuts / Action button, no app open). Share target. **Desktop**: Tauri capture-only window on global hotkey, kept warm, hides only after durable local ack | §5 capture budgets met on both phones + desktop; airplane-mode capture syncs later, no duplicates |
+| **M3** | Capture anywhere (PWA) | Installable PWA on phone + desktop: capture-first launch (`/capture` start URL), manifest shortcuts ("Add task") for Android/desktop long-press, Web Share Target → Inbox, mobile capture sheet with accessory row (`#` `@` `!` `by` 📅), iOS "Add to Home Screen" flow | Phone home-screen icon → keyboard focused ≤ 1.5 s; airplane-mode capture syncs later, no duplicates |
 | **M4** | Shape it | Lane editor Simple (date / project / priority / label / field / ready) ⇄ Text, last valid query kept; view settings (cascade, density, view as text); presets (Deadlines, Ready, per project); recipes copy/paste as text; custom field defs; dependencies (quiet blocked marker + "Ready" filter, never hidden); manual order per scope; grouping (maybe) | Build your own board from scratch without docs; paste a recipe from text |
-| **M5** | Mobile, full | Lane view with swipe between lanes + labelled swipe-to-move + Move command; task detail; lane widget with tap-to-complete (occurrence-specific); widget refresh on change | Complete from the widget with the app terminated; shows on web after sync |
+| **M5** | Mobile, full (PWA) | Lane view with swipe between lanes + labelled swipe-to-move + Move command; task detail; touch drag | Daily use on phone for a week |
 | **M6** | Reach | Email-in via intake Worker; scoped API tokens + REST (`/api/v1/tasks`, `/views/:id/lanes`); `dolist` CLI | `dolist add "Call mum by fri !2"`; mail lands in Inbox |
+| — | Later: native | Spike B, then Expo app (widgets, App Intents, lock screen) + Tauri capture window, per the native rows in §1/§4 | Separate go-ahead |
 | — | Later gate | Webhooks (allowlisted destinations only), plugins (own threat model) | Separate design review |
 
 **Ordering logic**: risks first (M0 spikes), real data first (corpus in M0, import in M1), smallest daily-usable loop next (M1), then multi-device (M2) and capture everywhere (M3) before customization depth (M4).
-**Parallel tracks**: spikes A/B/C concurrent. Native scaffolding continues during M1. M3 phone ∥ desktop.
+**Parallel tracks**: spikes A/C concurrent. Native waits until the PWA proves the core.
 
 ---
 
@@ -184,13 +185,13 @@ Fixtures: generated 10k-task set + your real import.
 
 ---
 
-## 7. Decisions for you
+## 7. Decisions (answered 2026-11-24)
 
-| # | Question | Default until you answer |
+| # | Question | Decision |
 |---|---|---|
-| 1 | **Horizons lanes: place tasks by either date (current), or by scheduled date only, with a separate Deadlines preset?** Both round-3 design reviewers + Jobs prefer scheduled-only (a card that refuses to move feels broken); DHH says keep either-date. | Either date (your original example). Switching is cheap: it's one recipe |
-| 2 | Read-only Todoist export via your personal API token for the M0 corpus? | Needed; I'll ask for the token when M0 starts |
-| 3 | Apple Developer + Google Play accounts for signed device builds | Needed for spike B |
-| 4 | Round 2 options (never marked) | Recommended cards: `by fri`, `!1` + `p1` alias, `#` + accessory key, drag = earliest fitting date, deadline pin = refuse + explain, `name:value`, deps in detail, one look + compact, rolling lanes |
-| 5 | Lock-screen widget: task titles or counts only? | Titles; toggle in settings |
+| 1 | Horizons lane placement | **Either date, soonest wins.** Drag moves the scheduled date; a deadline sooner than the target lane pins the card (refuse + explain) |
+| 2 | Todoist corpus | Personal token in `.env.local` (`TODOIST_PERSONAL_TOKEN`). Read-only; export stays in gitignored `fixtures/private/` |
+| 3 | Native apps | Accounts exist, but **PWA only first**. Spike B, Expo and Tauri move to Later; M3 = PWA capture |
+| 4 | Round 2 options | Recommended cards: `by fri`, `!1` + `p1` alias, `#` + accessory key, drag = earliest fitting date, deadline pin = refuse + explain, `name:value`, deps in detail, one look + compact, rolling lanes |
+| 5 | Lock-screen widget | Titles (toggle in settings), when native lands |
 | 6 | Webhooks + plugins | Out of committed scope until the core proves itself |

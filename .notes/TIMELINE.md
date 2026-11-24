@@ -6,3 +6,4 @@
 - 2026-11-23 phoneafriend (codex, Jobs+DHH): fixed parser day/month prefix bug + cascade-off drag; rest logged as round 3 inputs.
 - 2026-11-24 Cloudflare Worker `dolist` (static assets) + GH Actions deploy workflow; custom domain dolist.gratis.sh attached on first deploy.
 - 2026-11-24 Implementation plan v2 (docs/IMPLEMENTATION_PLAN.md) after 5-persona codex review; M0 = foundation + 3 spikes, replaces brainstorm page on prod.
+- 2026-11-24: §7 answered — either-date soonest wins; PWA only first (native → Later); Todoist token in .env.local
