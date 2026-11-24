@@ -10,3 +10,6 @@
 - npm workspaces: `vitest`/`eslint` run from root; spikes/ excluded from both on purpose.
 - TinyBase: stock IndexedDB persister rewrites the whole store per save (~230 ms at 10k) → use `spikes/sync/src/idb-incremental.js` pattern. `load()`+`startAutoSave()`, never `startAutoPersisting()` (1 s full re-read). Bulk `setContent` of 10k freezes 4 s → batch imports.
 - TinyBase skew guard (5 min) silently drops ALL edits from a fast-clock device, then later they overwrite newer edits → stamp with server-offset time.
+- Acks must wait for `flush()` (apps/web/src/modules/dolist.js): an IDB write aborted by navigation within ms is lost. Toasts/draft-clear happen after commit.
+- TinyBase `persister.schedule()` with no args throws on an empty queue; wait for persister status idle (store's `flush()` does).
+- Lint `--fix` rewrites files mid-session → harness reports "changed on disk"; check `git diff` before assuming another agent touched it.

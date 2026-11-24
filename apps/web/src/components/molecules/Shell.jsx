@@ -1,11 +1,13 @@
 import { NavLink } from 'react-router'
 import styled from 'styled-components'
-import { CalendarDays, Columns3, Inbox, Settings } from 'lucide-react'
+import { CalendarDays, CircleCheck, Columns3, Inbox, Search, Settings } from 'lucide-react'
 
 const NAV = [
     { to: `/inbox`, label: `Inbox`, Icon: Inbox },
     { to: `/today`, label: `Today`, Icon: CalendarDays },
     { to: `/horizons`, label: `Horizons`, Icon: Columns3 },
+    { to: `/search`, label: `Search`, Icon: Search },
+    { to: `/completed`, label: `Completed`, Icon: CircleCheck, desktop_only: true },
     { to: `/settings`, label: `Settings`, Icon: Settings },
 ]
 
@@ -39,7 +41,7 @@ const Nav = styled.nav`
         padding: .25rem .5rem calc( .25rem + env(safe-area-inset-bottom) );
         border-right: 0; border-top: 1px solid var(--line-soft); background: var(--page);
 
-        .brand { display: none }
+        .brand, .desktop-only { display: none }
         a { flex: 1; flex-direction: column; justify-content: center; gap: .1rem; font-size: .72rem; border-radius: 0; position: relative }
         a.active { background: none }
         a.active::after { content: ""; position: absolute; inset: 0 25% auto; height: 3px; background: var(--accent); border-radius: 0 0 3px 3px }
@@ -52,7 +54,7 @@ export default function Shell( { children } ) {
     return <Frame>
         <Nav aria-label="Main">
             <span className="brand">Dolist</span>
-            { NAV.map( ( { to, label, Icon } ) => <NavLink key={ to } to={ to }>
+            { NAV.map( ( { to, label, Icon, desktop_only } ) => <NavLink key={ to } to={ to } className={ desktop_only ? `desktop-only` : undefined }>
                 <Icon size={ 20 } strokeWidth={ 1.5 } aria-hidden />
                 <span>{ label }</span>
             </NavLink> ) }

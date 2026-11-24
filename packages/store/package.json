@@ -1,0 +1,23 @@
+{
+  "name": "@dolist/store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./react": "./src/react.js"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "fake-indexeddb": "^6.2.8",
+    "happy-dom": "^21.0.4"
+  },
+  "dependencies": {
+    "@dolist/core": "^0.0.0",
+    "tinybase": "^10.1.0",
+    "uuid": "^14.0.3"
+  }
+}
