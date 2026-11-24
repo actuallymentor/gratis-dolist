@@ -61,6 +61,7 @@ test( `complete with undo, then reopen from history`, async ( { page } ) => {
     await expect( page.getByText( `Completed “Water plants”` ).last() ).toBeVisible()
     await page.goto( `/completed` )
     await page.getByRole( `button`, { name: `Reopen` } ).click()
+    await expect( page.getByText( `Reopened “Water plants”` ) ).toBeVisible()
     await page.goto( `/inbox` )
     await expect( page.getByRole( `button`, { name: `Water plants` } ) ).toBeVisible()
 

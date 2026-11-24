@@ -5,6 +5,8 @@ import { completed_history, uncomplete_task } from '@dolist/store'
 import { use_store, use_tasks } from '@dolist/store/react'
 import Page from '../atoms/Page'
 import EmptyState from '../atoms/EmptyState'
+import toast from 'react-hot-toast'
+import { flush } from '../../modules/dolist'
 
 const Rows = styled.ol`
     list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem;
@@ -23,6 +25,13 @@ export default function CompletedPage() {
 
     const store = use_store()
     const tasks = use_tasks( { include_completed: true } )
+    // Reopen, acked once on disk (like every other change)
+    const reopen = async ( task, occurrence ) => {
+        uncomplete_task( store, task.id, occurrence )
+        const saved = await flush().then( () => true, () => false )
+        if( saved ) toast( `Reopened “${ task.title }”` )
+    }
+
     const history = useMemo( () => completed_history( store, { limit: 200 } ), [ store, tasks ] )
 
     return <Page title="Completed">
@@ -31,7 +40,7 @@ export default function CompletedPage() {
             { history.map( ( { task, occurrence, at } ) => <li key={ `${ task.id }:${ occurrence || `` }` }>
                 <span className="t">{ task.title }</span>
                 <time dateTime={ new Date( at ).toISOString() }>{ when( at ) }</time>
-                <button onClick={ () => uncomplete_task( store, task.id, occurrence ) }><RotateCcw size={ 14 } aria-hidden /> Reopen</button>
+                <button onClick={ () => reopen( task, occurrence ) }><RotateCcw size={ 14 } aria-hidden /> Reopen</button>
             </li> ) }
         </Rows>
     </Page>
