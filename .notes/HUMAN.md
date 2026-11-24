@@ -1,5 +1,4 @@
 # For the human
 
-- Round 2 options awaiting marks on the prototype (collection `feedback2`).
-- Rolling vs calendar default lanes: rolling recommended, unconfirmed.
-- 2026-11-23 external review → round 3 candidates in RESEARCH_PLAN "Round 3 inputs". Biggest: task detail view, editable chips, drag preview, "outside this view" count. Open question: lanes place by scheduled date only (deadline shown, not placing)?
+- Implementation plan v2 §7 decisions: (1) Horizons placement either-date vs scheduled-only, (2) Todoist token for corpus, (3) Apple/Google dev accounts, (4) round 2 defaults, (5) lock-screen titles, (6) webhooks/plugins deferred.
+- Prod (dolist.gratis.sh) still serves the brainstorm prototype until M0 ships the app shell.
