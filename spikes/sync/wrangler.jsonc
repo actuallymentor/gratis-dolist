@@ -1,0 +1,8 @@
+{
+  // Local-only spike server: `npm run worker`
+  "name": "dolist-sync-spike",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-01",
+  "durable_objects": { "bindings": [{ "name": "SYNC", "class_name": "SyncDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SyncDO"] }]
+}

@@ -46,7 +46,7 @@ gratis-dolist/                       npm workspaces, one lockfile
 | Concern | Choice | Fallback / note |
 |---|---|---|
 | Web | React + Vite, JS, styled-components, react-router, use-query-params, vite-plugin-pwa, lucide-react, mentie. **zustand only for UI state**; tasks live in TinyBase | — |
-| Data + sync | TinyBase **≥ 9.6** MergeableStore. Web: IndexedDB persister + BroadcastChannel synchronizer across tabs. Native: expo-sqlite (JSON mode). Server: `WsServerDurableObject`, one DO per user, SQLite (fragmented) | Gate = M0 spike (§3). Fallback: own per-field LWW op-log in the same DO, contained in `packages/store` |
+| Data + sync | TinyBase **≥ 10.1** MergeableStore. Web: own incremental IndexedDB persister (row-level writes + stored hashes; stock persister fails the 100 ms write budget at 10k, spike A) + BroadcastChannel synchronizer across tabs. Native: expo-sqlite (JSON mode). Server: `WsServerDurableObject`, one DO per user, SQLite (fragmented) | Spike A: **go** (`spikes/sync/RESULTS.md`). Client clock = server time offset from handshake; keep 5 min skew guard + "device clock is off" hint. First sync: gzipped HTTP snapshot, then WS. Gate passed (§3). Fallback: own per-field LWW op-log in the same DO, contained in `packages/store` |
 | Auth | Typed credentials (§4) in D1, hashes only | — |
 | API | Hono on the Worker | — |
 | Dates | chrono-node (`/en`) inside our grammar; floating dates vs instants (§2.4) | — |

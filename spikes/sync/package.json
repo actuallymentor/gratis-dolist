@@ -1,0 +1,21 @@
+{
+  "name": "dolist-spike-sync",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview",
+    "worker": "wrangler dev --port 8788 --local",
+    "bench:browser": "node bench/browser.mjs",
+    "bench:ws": "node bench/ws.mjs"
+  },
+  "dependencies": {
+    "tinybase": "^10.1.0",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.18.1",
+    "vite": "^8.3.8",
+    "wrangler": "^4.168.0"
+  }
+}

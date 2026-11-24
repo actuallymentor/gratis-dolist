@@ -8,3 +8,5 @@
 - Waiting on a process: never `until ! pgrep -f "X"` when X appears in the loop's own cmdline (self-match → infinite loop). Use `pgrep -x` / match `[c]odex exec`.
 - `pkill -f "X"` inside a Bash call whose own command line also contains X kills the calling shell (exit 144). Kill by PID, or keep X out of the same command.
 - npm workspaces: `vitest`/`eslint` run from root; spikes/ excluded from both on purpose.
+- TinyBase: stock IndexedDB persister rewrites the whole store per save (~230 ms at 10k) → use `spikes/sync/src/idb-incremental.js` pattern. `load()`+`startAutoSave()`, never `startAutoPersisting()` (1 s full re-read). Bulk `setContent` of 10k freezes 4 s → batch imports.
+- TinyBase skew guard (5 min) silently drops ALL edits from a fast-clock device, then later they overwrite newer edits → stamp with server-offset time.
