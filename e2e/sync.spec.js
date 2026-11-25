@@ -194,3 +194,17 @@ test( `a lost enrollment response can be retried`, async ( { browser, request } 
     await sign_in( late.page, ENROLLMENT_CODE )
     await expect( late.page.getByText( `That code didn't work` ) ).toBeVisible()
 } )
+
+test( `new recovery codes void the old ones`, async ( { browser } ) => {
+    const tenant = owner()
+    const a = await device( browser, tenant )
+    const [ old_code ] = await enroll( a.page )
+    await a.page.getByRole( `button`, { name: `New codes` } ).click()
+    const [ new_code ] = ( await a.page.getByLabel( `Recovery codes` ).textContent() ).split( `\n` )
+
+    const b = await device( browser, tenant )
+    await sign_in( b.page, old_code )
+    await expect( b.page.getByText( `That code didn't work` ) ).toBeVisible()
+    await sign_in( b.page, new_code )
+    await expect( status( b.page ) ).toHaveText( `Synced` )
+} )

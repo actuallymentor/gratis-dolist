@@ -105,9 +105,8 @@ export class Auth extends DurableObject {
         if( this.enrollable() && hash === enrollment_hash ) {
             for( const table of [ `owner`, `sessions`, `recovery`, `pairing` ] ) this.sql.exec( `DELETE FROM ${ table }` )
             this.sql.exec( `INSERT INTO owner ( id, created ) VALUES ( ?, ? )`, crypto.randomUUID(), now )
-            const recovery_codes = Array.from( { length: RECOVERY_CODES }, () => random_code( 80 ) )
-            for( const recovery of recovery_codes ) this.sql.exec( `INSERT INTO recovery ( code_hash ) VALUES ( ? )`, await sha256( normalize_code( recovery ) ) )
-            return { ...await this.open_session( label, now ), recovery_codes }
+            const session = await this.open_session( label, now )
+            return { ...session, recovery_codes: await this.new_recovery_codes() }
         }
 
         // Pairing + recovery codes are single-use: delete-then-check is atomic inside the DO
@@ -147,6 +146,18 @@ export class Auth extends DurableObject {
         const expires = now + PAIRING_TTL
         this.sql.exec( `INSERT INTO pairing ( code_hash, expires ) VALUES ( ?, ? )`, await sha256( normalize_code( code ) ), expires )
         return { code, expires }
+    }
+
+    /**
+     * Replaces all recovery codes (enrollment, or a signed-in owner rotating them). Plaintext leaves once.
+     * @returns {Promise<string[]>}
+     */
+    async new_recovery_codes() {
+        const codes = Array.from( { length: RECOVERY_CODES }, () => random_code( 80 ) )
+        const hashes = await Promise.all( codes.map( code => sha256( normalize_code( code ) ) ) )
+        this.sql.exec( `DELETE FROM recovery` )
+        hashes.forEach( hash => this.sql.exec( `INSERT INTO recovery ( code_hash ) VALUES ( ? )`, hash ) )
+        return codes
     }
 
     /**

@@ -61,9 +61,25 @@ export default function SyncSection() {
             announce_account_change()
             toast( `Signed in. Syncing.` )
         } catch ( error ) {
-            toast( error.message )
+
+            // The reply can be cut off after the session was created (the code is used up by then): check
+            const account = await refresh_account()
+            if( !account?.signed_in ) return toast( error.message )
+            set_code( `` )
+            await begin_sync()
+            announce_account_change()
+            toast( `Signed in, but the reply was cut off. If this was your first device, make new recovery codes below.`, { duration: 10_000 } )
         } finally {
             set_busy( false )
+        }
+    }
+
+    const rotate_recovery = async () => {
+        try {
+            const { recovery_codes } = await api( `/api/recovery-codes`, { method: `POST` } )
+            set_recovery( recovery_codes )
+        } catch ( error ) {
+            toast( error.message )
         }
     }
 
@@ -153,6 +169,11 @@ export default function SyncSection() {
                 </button>
             </div>
         } ) }
+
+        <div className="row">
+            <span>Recovery codes<small>Sign in once each if you lose every device. Making new ones voids the old.</small></span>
+            <button onClick={ rotate_recovery }><KeyRound size={ 16 } strokeWidth={ 1.5 } aria-hidden /> New codes</button>
+        </div>
 
         <div className="row">
             <span>Backups<small>Nightly, last 30 kept. To restore, download one and use Import file below: tasks in the backup return as they were then, tasks added since stay.</small></span>

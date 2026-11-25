@@ -90,6 +90,8 @@ app.post( `/api/logout`, signed_in, async c => {
 
 app.post( `/api/pair`, signed_in, async c => c.json( await auth_of( c ).pair() ) )
 
+app.post( `/api/recovery-codes`, signed_in, async c => c.json( { recovery_codes: await auth_of( c ).new_recovery_codes() } ) )
+
 app.get( `/api/devices`, signed_in, async c => c.json( await auth_of( c ).sessions() ) )
 
 // Revoke: fence + close sockets in Sync first, then kill the session. If either step fails, retrying
