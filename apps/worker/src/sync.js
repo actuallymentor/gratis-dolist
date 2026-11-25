@@ -10,6 +10,10 @@ export const SESSION_HEADER = `x-dolist-session`
 export const FRAGMENT_SIZE = 256 * 1024
 const MAX_MESSAGE = 1024 * 1024
 
+// Backups live beside the store in this DO's SQLite: 30 kept, chunked under SQLite's 2 MB value cap
+const KEEP_SNAPSHOTS = 30
+const CHUNK = 1024 * 1024
+
 // Close code the client reads as "this device was signed out"
 export const REVOKED = 4401
 
@@ -66,12 +70,53 @@ export class Sync extends WsServerDurableObject {
         return sockets.length
     }
 
+    // ── Backups ──────────────────────────────────────────────────────────────
+
+    snapshot_tables() {
+        this.ctx.storage.sql.exec( `CREATE TABLE IF NOT EXISTS snapshots ( name TEXT PRIMARY KEY, uploaded INTEGER, size INTEGER )` )
+        this.ctx.storage.sql.exec( `CREATE TABLE IF NOT EXISTS snapshot_chunks ( name TEXT, seq INTEGER, data TEXT, PRIMARY KEY ( name, seq ) )` )
+        return this.ctx.storage.sql
+    }
+
     /**
-     * The whole store as a Dolist export (same format Settings imports).
-     * @returns {string}
+     * Saves the whole store as a Dolist export (the format Settings imports) and prunes to the newest 30.
+     * @returns {string} the backup's name
      */
-    snapshot() {
-        return export_json( this.store )
+    take_snapshot() {
+        const sql = this.snapshot_tables()
+        const json = export_json( this.store )
+        const now = new Date()
+        const name = `${ now.toISOString() }.json`
+
+        this.ctx.storage.transactionSync( () => {
+            sql.exec( `INSERT OR REPLACE INTO snapshots VALUES ( ?, ?, ? )`, name, now.getTime(), json.length )
+            for( let seq = 0; seq * CHUNK < json.length; seq++ ) {
+                sql.exec( `INSERT OR REPLACE INTO snapshot_chunks VALUES ( ?, ?, ? )`, name, seq, json.slice( seq * CHUNK, ( seq + 1 ) * CHUNK ) )
+            }
+            const stale = sql.exec( `SELECT name FROM snapshots ORDER BY name DESC LIMIT -1 OFFSET ?`, KEEP_SNAPSHOTS ).toArray()
+            stale.forEach( ( { name } ) => {
+                sql.exec( `DELETE FROM snapshots WHERE name = ?`, name )
+                sql.exec( `DELETE FROM snapshot_chunks WHERE name = ?`, name )
+            } )
+        } )
+        return name
+    }
+
+    /**
+     * @returns {{ name: string, uploaded: string, size: number }[]} newest first
+     */
+    snapshots() {
+        return this.snapshot_tables().exec( `SELECT name, uploaded, size FROM snapshots ORDER BY name DESC` ).toArray()
+            .map( ( { name, uploaded, size } ) => ( { name, uploaded: new Date( uploaded ).toISOString(), size } ) )
+    }
+
+    /**
+     * @param {string} name
+     * @returns {string|null} the backup's JSON
+     */
+    read_snapshot( name ) {
+        const chunks = this.snapshot_tables().exec( `SELECT data FROM snapshot_chunks WHERE name = ? ORDER BY seq`, name ).toArray()
+        return chunks.length ? chunks.map( ( { data } ) => data ).join( `` ) : null
     }
 
 }

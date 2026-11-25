@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { ENROLLMENT_CODE } from '../playwright.config.js'
 
-// M2 exit criteria against real wrangler dev (Worker + Auth/Sync DOs + local R2).
+// M2 exit criteria against real wrangler dev (Worker + Auth/Sync DOs).
 // Each test is its own owner: the E2E-only `dolist_tenant` cookie picks an isolated Auth DO.
 
 const quick_add = page => page.getByRole( `textbox`, { name: `New task` } )

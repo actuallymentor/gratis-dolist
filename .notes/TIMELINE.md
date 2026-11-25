@@ -14,3 +14,4 @@
 - 2026-11-25: phoneafriend (5/5 BLOCK) on M1 fixes → stale detail commit, duplicated-tab drafts, persister repair, unparsed-recur history, Horizons outside cap, legacy draft key. All fixed + regression tests.
 - 2026-11-25: M2 started autonomously (yolo, after repeated stall checks). Auth in Auth DO (not D1), Sync DO hub mode, R2 nightly snapshots. Design review (5/5 REVISE) → revocation fence, per-IP throttle, no tab leader, persisted clock offset.
 - 2026-11-25: M3 (PWA capture) started autonomously after another stall check: /capture start URL, shortcuts, share target, accessory row, iOS how-to in Settings.
+- 2026-11-25: CF token lacks R2 → backups now stored in Sync DO SQLite; ENROLLMENT_CODE uploaded by the deploy step from the GH secret.

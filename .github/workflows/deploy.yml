@@ -74,8 +74,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          # The snapshot bucket must exist before the first deploy binds it
-          preCommands: npx wrangler r2 bucket info dolist-snapshots || npx wrangler r2 bucket create dolist-snapshots
           # First-device enrollment code (closes after the owner's first sign-in)
           secrets: ENROLLMENT_CODE
           command: deploy

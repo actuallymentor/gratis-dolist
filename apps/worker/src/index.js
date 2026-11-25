@@ -5,8 +5,6 @@ import { SESSION_HEADER, Sync } from './sync.js'
 
 export { Auth, Sync }
 
-const SNAPSHOT_PREFIX = `snapshots/`
-const KEEP_SNAPSHOTS = 30
 const COOKIE_DAYS = 400
 
 // https gets the hardened __Host- cookie; http is only ever wrangler dev on localhost
@@ -24,21 +22,6 @@ const auth_of = c => {
     return c.env.AUTH.get( c.env.AUTH.idFromName( `auth:${ tenant }` ) )
 }
 const sync_of = ( env, owner_id ) => env.SYNC.get( env.SYNC.idFromName( owner_id ) )
-
-/**
- * Takes one owner's snapshot into R2 and prunes old ones.
- * @returns {Promise<string>} the new key
- */
-const take_snapshot = async ( env, owner_id ) => {
-    const json = await sync_of( env, owner_id ).snapshot()
-    const key = `${ SNAPSHOT_PREFIX }${ owner_id }/${ new Date().toISOString() }.json`
-    await env.SNAPSHOTS.put( key, json, { httpMetadata: { contentType: `application/json` } } )
-
-    const { objects } = await env.SNAPSHOTS.list( { prefix: `${ SNAPSHOT_PREFIX }${ owner_id }/` } )
-    const stale = objects.map( ( { key } ) => key ).sort().slice( 0, -KEEP_SNAPSHOTS )
-    if( stale.length ) await env.SNAPSHOTS.delete( stale )
-    return key
-}
 
 const app = new Hono()
 
@@ -106,22 +89,19 @@ app.delete( `/api/devices/:id`, signed_in, async c => {
 } )
 
 app.get( `/api/snapshots`, signed_in, async c => {
-    const { owner_id } = c.get( `session` )
-    const { objects } = await c.env.SNAPSHOTS.list( { prefix: `${ SNAPSHOT_PREFIX }${ owner_id }/` } )
-    return c.json( objects.map( ( { key, size, uploaded } ) => ( { name: key.split( `/` ).pop(), size, uploaded } ) ).reverse() )
+    return c.json( await sync_of( c.env, c.get( `session` ).owner_id ).snapshots() )
 } )
 
 app.post( `/api/snapshots`, signed_in, async c => {
-    const key = await take_snapshot( c.env, c.get( `session` ).owner_id )
-    return c.json( { name: key.split( `/` ).pop() } )
+    return c.json( { name: await sync_of( c.env, c.get( `session` ).owner_id ).take_snapshot() } )
 } )
 
 app.get( `/api/snapshots/:name`, signed_in, async c => {
     const name = c.req.param( `name` )
     if( !/^[\w.:-]+\.json$/.test( name ) ) return c.json( { error: `Bad name` }, 400 )
-    const object = await c.env.SNAPSHOTS.get( `${ SNAPSHOT_PREFIX }${ c.get( `session` ).owner_id }/${ name }` )
-    if( !object ) return c.json( { error: `Not found` }, 404 )
-    return new Response( object.body, { headers: {
+    const json = await sync_of( c.env, c.get( `session` ).owner_id ).read_snapshot( name )
+    if( json === null ) return c.json( { error: `Not found` }, 404 )
+    return new Response( json, { headers: {
         'Content-Type': `application/json`,
         'Content-Disposition': `attachment; filename="dolist-backup-${ name }"`,
         'Cache-Control': `no-store`,
@@ -146,6 +126,6 @@ export default {
     async scheduled( event, env ) {
         const auth = env.AUTH.get( env.AUTH.idFromName( `auth:default` ) )
         const owner_id = await auth.owner()
-        if( owner_id ) await take_snapshot( env, owner_id )
+        if( owner_id ) await sync_of( env, owner_id ).take_snapshot()
     },
 }

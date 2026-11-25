@@ -24,10 +24,7 @@
     { "tag": "v1", "new_sqlite_classes": [ "Auth", "Sync" ] }
   ],
 
-  // Nightly snapshots (kept 30)
-  "r2_buckets": [
-    { "binding": "SNAPSHOTS", "bucket_name": "dolist-snapshots" }
-  ],
+  // Nightly backup, kept 30 in the Sync DO's own SQLite (no R2 needed)
   "triggers": { "crons": [ "17 3 * * *" ] },
 
   // ENROLLMENT_CODE is a secret (wrangler secret put). The e2e tenant switch only ever comes from `wrangler dev --var`
