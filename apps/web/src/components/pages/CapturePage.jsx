@@ -1,14 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import styled from 'styled-components'
 import { Check, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { add_task } from '@dolist/store'
+import { add_task, update_task } from '@dolist/store'
 import { use_store } from '@dolist/store/react'
 import Page from '../atoms/Page'
 import QuickAdd from '../molecules/QuickAdd'
 import { shared_task } from '../../modules/share'
 import { flush } from '../../modules/dolist'
+import { adopt_orphan_draft, read_draft, write_draft } from '../../modules/drafts'
+
+// A pending share is its own draft (survives navigation, reload, relaunch) until added or discarded
+const SHARE = `share`
+const read_share = () => {
+    try {
+        return JSON.parse( read_draft( SHARE ) || `null` )
+    } catch {
+        return null
+    }
+}
+const write_share = share => write_draft( SHARE, share ? JSON.stringify( share ) : `` )
 
 const Added = styled.ul`
     list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem;
@@ -47,21 +59,44 @@ export default function CapturePage() {
     const [ added, set_added ] = useState( [] )
     const remember = title => set_added( list => [ title, ...list ].slice( 0, 5 ) )
 
-    // The share stays in the URL until added or discarded, so a reload never loses it
-    const share = shared_task( params )
-    const [ share_title, set_share_title ] = useState( share?.title ?? `` )
+    // A new share (URL) wins over a pending one; the same share reloaded keeps its edits (draft remembers its source)
+    const [ share, set_share ] = useState( () => {
+        const pending = read_share()
+        const source = params.toString()
+        const incoming = shared_task( params )
+        if( !incoming || pending?.source === source ) return pending
+        return { ...incoming, source }
+    } )
     const [ saving, set_saving ] = useState( false )
-    const clear_share = () => navigate( `/capture`, { replace: true } )
+
+    // Retry-safe: the first tap creates the task, a retry after a failed save only saves it again
+    const saved_id = useRef( null )
+    useEffect( () => {
+        write_share( share )
+    }, [ share ] )
+
+    // A share left pending in a closed tab comes back here
+    useEffect( () => {
+        if( !share ) adopt_orphan_draft( SHARE ).then( adopted => adopted && set_share( read_share() ) )
+    }, [] )
+
+    const clear_share = () => {
+        set_share( null )
+        write_share( null )
+        saved_id.current = null
+        if( params.size ) navigate( `/capture`, { replace: true } )
+    }
 
     const add_share = async event => {
         event.preventDefault()
-        // One tap, one task: a double tap mustn't add the share twice
-        if( !share_title.trim() || saving ) return
+        const title = share.title.trim()
+        if( !title || saving ) return
         set_saving( true )
-        add_task( store, { title: share_title.trim(), notes: share.notes || undefined } )
+        if( saved_id.current ) update_task( store, saved_id.current, { title, notes: share.notes || null } )
+        else saved_id.current = add_task( store, { title, notes: share.notes || undefined } )
         try {
             await flush()
-            remember( share_title.trim() )
+            remember( title )
             clear_share()
         } catch {
             toast( `Couldn't save it on this device. Try again once storage frees up.` )
@@ -73,7 +108,7 @@ export default function CapturePage() {
     return <Page title="Add a task">
         { share && <Shared onSubmit={ add_share } aria-label="Shared">
             <span className="label"><Share2 size={ 14 } strokeWidth={ 1.5 } aria-hidden /> Shared with Dolist</span>
-            <input value={ share_title } onChange={ ( { target: { value } } ) => set_share_title( value ) } aria-label="Shared task title" />
+            <input value={ share.title } onChange={ ( { target: { value } } ) => set_share( { ...share, title: value } ) } aria-label="Shared task title" />
             { share.notes && <p className="notes" aria-label="Shared notes">{ share.notes }</p> }
             <div className="actions">
                 <button type="submit" disabled={ saving }>Add to Inbox</button>

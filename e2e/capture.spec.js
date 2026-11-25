@@ -32,15 +32,21 @@ test( `a share is its own literal task, kept until added, never mixed into the d
     await expect( card.getByLabel( `Shared task title` ) ).toHaveValue( `Read #home tomorrow !1` )
     await expect( quick_add( page ) ).toHaveValue( `Buy milk tomorrow` )
 
-    // Reload keeps it; adding saves it verbatim to the Inbox, then it's gone from the URL
+    // Edits survive a reload, and leaving for the Inbox and coming back keeps the card
+    await card.getByLabel( `Shared task title` ).fill( `Read later #home tomorrow !1` )
     await page.reload()
+    await page.getByRole( `link`, { name: `Inbox` } ).first().click()
+    await page.goto( `/capture` )
+    await expect( card.getByLabel( `Shared task title` ) ).toHaveValue( `Read later #home tomorrow !1` )
     await card.getByRole( `button`, { name: `Add to Inbox` } ).click()
-    await expect( page ).toHaveURL( /\/capture$/ )
-    await expect( page.getByLabel( `Just added` ) ).toContainText( `Read #home tomorrow !1` )
+    await expect( page.getByLabel( `Just added` ) ).toContainText( `Read later #home tomorrow !1` )
+    await expect( card ).toHaveCount( 0 )
+    await page.reload()
+    await expect( card ).toHaveCount( 0 )
     await expect( quick_add( page ) ).toHaveValue( `Buy milk tomorrow` )
 
     await page.goto( `/inbox` )
-    await page.getByRole( `button`, { name: `Read #home tomorrow !1` } ).click()
+    await page.getByRole( `button`, { name: `Read later #home tomorrow !1` } ).click()
     await expect( page.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `https://example.com/a` )
     await expect( page.getByRole( `dialog` ).getByLabel( `Scheduled` ) ).toHaveValue( `` )
 } )

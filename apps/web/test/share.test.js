@@ -15,7 +15,15 @@ describe( `shared_task`, () => {
 
     it( `a link repeated in text is kept once, a different link is kept too`, () => {
         expect( share( { title: `Post`, text: `Post https://x.com/p`, url: `https://x.com/p` } ) ).toEqual( { title: `Post`, notes: `Post https://x.com/p` } )
+        expect( share( { url: `https://x.com/p` } ) ).toEqual( { title: `https://x.com/p`, notes: `https://x.com/p` } )
         expect( share( { title: `Post`, text: `See https://x.com/p/related`, url: `https://x.com/p` } ) ).toEqual( { title: `Post`, notes: `See https://x.com/p/related\nhttps://x.com/p` } )
+    } )
+
+    it( `a long paragraph keeps every word (shortened title, whole text in notes)`, () => {
+        const long = `word `.repeat( 100 ).trim()
+        const { title, notes } = share( { text: long } )
+        expect( title ).toHaveLength( 300 )
+        expect( notes ).toBe( long )
     } )
 
     it( `plain text has no added quotes; nothing shared is null`, () => {

@@ -13,13 +13,17 @@ export const shared_task = params => {
     const lines = get( `text` ).split( `\n` ).map( line => line.trim() ).filter( Boolean )
     const url = get( `url` )
 
-    const title = ( shared_title || lines[ 0 ] || url ).replace( /\s+/g, ` ` ).slice( 0, 300 )
+    const source = shared_title || lines[ 0 ] || url
+    const title = source.replace( /\s+/g, ` ` ).slice( 0, 300 )
     if( !title ) return null
 
+    // The first line moves into the title unless the title shortened it (then notes keep it whole)
+    const rest = lines.filter( ( line, index ) => !( index === 0 && !shared_title && line === title ) )
+
+    // The link is checked against notes only: the title is editable, renaming must never lose it
     const has_word = ( haystack, needle ) => haystack.split( /\s+/ ).includes( needle )
-    const rest = lines.filter( ( line, index ) => !( index === 0 && !shared_title ) && line !== title )
-    const all_text = [ title, ...rest ].join( ` ` )
-    const notes = [ ...rest, url && !has_word( all_text, url ) ? url : `` ].filter( Boolean ).join( `\n` )
+    const keep_url = url && !has_word( rest.join( ` ` ), url )
+    const notes = [ ...rest, keep_url ? url : `` ].filter( Boolean ).join( `\n` )
 
     return { title, notes }
 }
