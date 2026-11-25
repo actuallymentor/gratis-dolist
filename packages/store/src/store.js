@@ -46,7 +46,7 @@ export const create_dolist_store = ( { name = `dolist`, persist = true, get_now 
         return () => save_error_listeners.delete( listener )
     }
 
-    const { persister, close, load_error } = create_idb_persister( store, name, { on_save_error: report_save_error } )
+    const { persister, close, load_error, needs_repair } = create_idb_persister( store, name, { on_save_error: report_save_error } )
     const synchronizer = createBroadcastChannelSynchronizer( store, `${ name }:tabs` )
 
     // load → autosave (skips the initial full save) → migrate (saved incrementally) → join tabs.
@@ -73,10 +73,16 @@ export const create_dolist_store = ( { name = `dolist`, persist = true, get_now 
     persister.addStatusListener( ( _, status ) => {
         if( status === IDLE && waiting.length ) settle()
     } )
-    const flush = () => new Promise( ( resolve, reject ) => {
+    const wait_idle = () => new Promise( ( resolve, reject ) => {
         waiting.push( { resolve, reject } )
         if( persister.getStatus() === IDLE ) settle()
     } )
+
+    // After a failed write, unchanged data never triggers autosave: a retry must force the repair save itself
+    const flush = async () => {
+        if( needs_repair() ) await persister.save().catch( () => {} )
+        return wait_idle()
+    }
 
     const destroy = async () => {
         await ready.catch( () => {} )

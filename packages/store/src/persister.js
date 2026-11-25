@@ -57,8 +57,9 @@ const hashes_of = stamps => map_values( stamps, ( [ , , hash ] ) => hash )
  * @param {string} [options.durability] - `strict` fsyncs each commit (survives power loss, ~1 ms)
  * @param {Function} [options.on_ignored_error]
  * @param {Function} [options.on_save_error] - called with each failed write (quota, aborted tx, ...)
- * @returns {{ persister: Object, close: Function, load_error: Function }} close() closes the IDB connection after
- *   persister.destroy(); load_error() returns the error of the last failed load, or null
+ * @returns {{ persister: Object, close: Function, load_error: Function, needs_repair: Function }} close() closes the IDB
+ *   connection after persister.destroy(); load_error() returns the error of the last failed load, or null;
+ *   needs_repair() is true after a failed write until a save succeeds
  */
 export const create_idb_persister = ( store, name, { durability = `strict`, on_ignored_error, on_save_error = () => {} } = {} ) => {
 
@@ -187,5 +188,6 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
     const close = async () => ( await db_promise.catch( () => null ) )?.close()
     const load_error = () => last_load_error
 
-    return { persister, close, load_error }
+    const needs_repair = () => repair_pending
+    return { persister, close, load_error, needs_repair }
 }

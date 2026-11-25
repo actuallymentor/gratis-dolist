@@ -101,15 +101,16 @@ const write_cells = ( store, id, patch ) => Object.entries( patch ).forEach( ( [
 /**
  * Adds a task.
  * @param {Object} store
- * @param {Object} fields - task cells (title required; project by `project_id`, absent = Inbox) + optional `labels` names
- * @returns {string} new task id (uuid v7)
+ * @param {Object} fields - task cells (title required; project by `project_id`, absent = Inbox) + optional `labels` names,
+ *   optional `id` for idempotent adds (same id again = same task, rewritten as open)
+ * @returns {string} task id (uuid v7 unless given)
  */
 export const add_task = ( store, fields ) => {
 
-    const { labels = [], ...rest } = fields
+    const { labels = [], id: given_id, ...rest } = fields
     if( !`${ rest.title ?? `` }`.trim() ) throw new Error( `add_task: title is required` )
 
-    const id = uuid()
+    const id = given_id ?? uuid()
     store.transaction( () => {
         store.setRow( `tasks`, id, { created_at: now_of( store ), ...to_cells( rest ) } )
 

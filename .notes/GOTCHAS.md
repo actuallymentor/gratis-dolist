@@ -30,3 +30,5 @@
 - **codex reviews get cut off by OpenAI's cyber filter** when prompts say "security holes"; frame as correctness/reliability.
 - **iOS won't raise the keyboard on autofocus** without a user gesture; /capture focuses the input (caret ready) but the tap-to-type remains on iOS. Real-device check pending.
 - **Floating pills cover mobile content** (bottom-left sits on lists/details). Keep persistent hints inline (Settings), pills only for transient actions.
+- **Idempotency beats per-tab guards.** Shares get a content-derived task id (`share-<fnv>`), so retries, history and cloned tabs can't duplicate. Re-adding rewrites the row (reopens a completed one).
+- **A retry with unchanged data never triggers autosave.** `flush()` forces a repair save when the persister has a failed write pending.

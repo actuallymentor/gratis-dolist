@@ -141,6 +141,24 @@ describe( `IndexedDB failures`, () => {
         expect( heard ).toHaveLength( 1 )
     } )
 
+    it( `flush after a failure repairs even when nothing changed since`, async () => {
+        const name = `db${ counter++ }`
+        const { store, flush, destroy } = await boot( name )
+
+        const quota = vi.spyOn( IDBDatabase.prototype, `transaction` ).mockImplementationOnce( () => {
+            throw new DOMException( `full`, `QuotaExceededError` )
+        } )
+        const id = add_task( store, { title: `Retry me` } )
+        await expect( flush() ).rejects.toThrow( /full/ )
+        quota.mockRestore()
+
+        // A retry that changes nothing (no change event, so no autosave): flush itself must write
+        await flush()
+        await destroy()
+        const reopened = await boot( name )
+        expect( reopened.store.getCell( `tasks`, id, `title` ) ).toBe( `Retry me` )
+    } )
+
     it( `the save after a failure repairs what the failed write dropped`, async () => {
         const name = `db${ counter++ }`
         const { store, flush, destroy } = await boot( name )

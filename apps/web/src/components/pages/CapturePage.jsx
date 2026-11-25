@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import styled from 'styled-components'
 import { Check, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { add_task, update_task } from '@dolist/store'
+import { add_task } from '@dolist/store'
 import { use_store } from '@dolist/store/react'
 import Page from '../atoms/Page'
 import QuickAdd from '../molecules/QuickAdd'
@@ -21,6 +21,14 @@ const read_share = () => {
     }
 }
 const write_share = share => write_draft( SHARE, share ? JSON.stringify( share ) : `` )
+
+// One share, one task: the id comes from the share itself, so a retry, a cloned tab or the share reopened
+// from history all land on the same task (FNV-1a, hex)
+const share_id = source => {
+    let hash = 0x811c9dc5
+    for( const char of source ) hash = Math.imul( hash ^ char.codePointAt( 0 ), 0x01000193 ) >>> 0
+    return `share-${ hash.toString( 16 ) }-${ source.length.toString( 16 ) }`
+}
 
 const Added = styled.ul`
     list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem;
@@ -68,9 +76,6 @@ export default function CapturePage() {
         return { ...incoming, source }
     } )
     const [ saving, set_saving ] = useState( false )
-
-    // Retry-safe: the first tap creates the task, a retry after a failed save only saves it again
-    const saved_id = useRef( null )
     useEffect( () => {
         write_share( share )
     }, [ share ] )
@@ -83,7 +88,6 @@ export default function CapturePage() {
     const clear_share = () => {
         set_share( null )
         write_share( null )
-        saved_id.current = null
         if( params.size ) navigate( `/capture`, { replace: true } )
     }
 
@@ -92,8 +96,7 @@ export default function CapturePage() {
         const title = share.title.trim()
         if( !title || saving ) return
         set_saving( true )
-        if( saved_id.current ) update_task( store, saved_id.current, { title, notes: share.notes || null } )
-        else saved_id.current = add_task( store, { title, notes: share.notes || undefined } )
+        add_task( store, { id: share_id( share.source ?? `${ share.title }\n${ share.notes }` ), title, notes: share.notes || undefined } )
         try {
             await flush()
             remember( title )

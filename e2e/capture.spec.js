@@ -71,3 +71,21 @@ test( `iOS shows Add to Home Screen in Settings, never a floating pill`, async (
     await page.goto( `/settings` )
     await expect( page.getByLabel( `Install on iPhone` ) ).toContainText( `Add to Home Screen` )
 } )
+
+test( `the same share added twice (history, second tab) is still one task`, async ( { page, context } ) => {
+    const url = `/capture?title=${ encodeURIComponent( `Only once please` ) }`
+    await page.goto( url )
+    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await expect( page.getByLabel( `Just added` ) ).toContainText( `Only once please` )
+
+    // Back through history, and in another tab
+    await page.goto( url )
+    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    const other = await context.newPage()
+    await other.goto( url )
+    await other.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await expect( other.getByLabel( `Just added` ) ).toBeVisible()
+
+    await page.goto( `/inbox` )
+    await expect( page.getByRole( `button`, { name: `Only once please` } ) ).toHaveCount( 1 )
+} )
