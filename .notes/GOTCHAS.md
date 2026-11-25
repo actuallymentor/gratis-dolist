@@ -24,3 +24,7 @@
 - **Offline WebSockets:** Chromium emulated offline stalls (no close), WebKit keeps it alive; `close()` while offline hangs on the handshake. Client detaches the socket on `offline` before closing.
 - **TinyBase WsServerDurableObject:** overriding `authorize` switches to hub mode; access object is the socket attachment (survives hibernation). Revocation needs a stored fence, not only closing sockets.
 - **Playwright browsers can vanish from ~/.cache** → `npx playwright install chromium webkit`.
+- **TinyBase `startSync()` resolves even when the exchange timed out**; errors only reach `onIgnoredError`. Never treat resolve as "synced".
+- **TinyBase skew guard drops edits silently** and HLCs are monotonic, so one fast-clock stamp poisons all later edits. Dolist runs with `Infinity`.
+- **`pgrep -f "x"` in a `while` loop matches its own shell** → loop never ends. Wait on explicit PIDs.
+- **codex reviews get cut off by OpenAI's cyber filter** when prompts say "security holes"; frame as correctness/reliability.

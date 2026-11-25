@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download, KeyRound, Link2, LogOut, Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { use_app_store } from '../../stores/app'
-import { api, begin_sync, device_label, end_sync, refresh_account } from '../../modules/sync'
+import { announce_account_change, api, begin_sync, device_label, end_sync, refresh_account } from '../../modules/sync'
 import { download_json } from '../../modules/todoist'
 
 const STATUS = {
@@ -33,15 +33,16 @@ export default function SyncSection() {
 
     const signed_in = !!account?.signed_in
 
-    // Devices + backups load once signed in
-    const load_lists = async () => {
-        const [ device_list, backup_list ] = await Promise.all( [ api( `/api/devices` ), api( `/api/snapshots` ) ] ).catch( () => [ [], [] ] )
-        set_devices( device_list )
-        set_backups( backup_list )
+    // Devices + backups load independently (a backup outage must never hide Sign out), and again once
+    // sync recovers; a failed load keeps what was shown
+    const load_lists = () => {
+        api( `/api/devices` ).then( set_devices, () => {} )
+        api( `/api/snapshots` ).then( set_backups, () => {} )
     }
+    const synced = status === `synced`
     useEffect( () => {
         if( signed_in ) load_lists()
-    }, [ signed_in ] )
+    }, [ signed_in, synced ] )
 
     // Fresh session state whenever Settings opens
     useEffect( () => {
@@ -57,6 +58,7 @@ export default function SyncSection() {
             set_code( `` )
             if( recovery_codes ) set_recovery( recovery_codes )
             await begin_sync()
+            announce_account_change()
             toast( `Signed in. Syncing.` )
         } catch ( error ) {
             toast( error.message )
@@ -79,6 +81,7 @@ export default function SyncSection() {
             await api( self ? `/api/logout` : `/api/devices/${ device.id }`, { method: self ? `POST` : `DELETE` } )
             if( self ) {
                 end_sync()
+                announce_account_change()
                 await refresh_account()
                 use_app_store.getState().set_sync_status( `off` )
                 return toast( `Signed out. Your tasks stay on this device.` )
@@ -90,7 +93,9 @@ export default function SyncSection() {
         }
     }
 
+    // Only while synced: then this device's changes are on the server, so the backup includes them
     const back_up = async () => {
+        if( status !== `synced` ) return toast( `Wait until this device is synced, so the backup includes your latest changes` )
         try {
             await api( `/api/snapshots`, { method: `POST` } )
             toast( `Backed up` )
@@ -151,7 +156,7 @@ export default function SyncSection() {
 
         <div className="row">
             <span>Backups<small>Nightly, last 30 kept. To restore, download one and use Import file below: tasks in the backup return as they were then, tasks added since stay.</small></span>
-            <button onClick={ back_up }><Save size={ 16 } strokeWidth={ 1.5 } aria-hidden /> Back up now</button>
+            <button onClick={ back_up } aria-disabled={ status !== `synced` }><Save size={ 16 } strokeWidth={ 1.5 } aria-hidden /> Back up now</button>
         </div>
         { backups.slice( 0, 5 ).map( ( { name, uploaded } ) => <div className="row" key={ name }>
             <span>{ when( Date.parse( uploaded ) ) }</span>

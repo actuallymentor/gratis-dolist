@@ -22,7 +22,10 @@ const IDLE = 0
  */
 export const create_dolist_store = ( { name = `dolist`, persist = true, get_now = Date.now } = {} ) => {
 
-    const store = createMergeableStore( undefined, get_now )
+    // No skew guard (Infinity): with it, a device that ever stamped ahead of real time has every later edit
+    // silently dropped by peers until the clock catches up. Without it, edits converge (a skewed clock can win
+    // a conflict). Single owner, own devices; server time offset (M2) keeps stamps honest anyway
+    const store = createMergeableStore( undefined, get_now, Infinity )
     set_clock( store, get_now )
 
     // Memory only: just migrate

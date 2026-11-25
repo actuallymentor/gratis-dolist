@@ -82,8 +82,8 @@ app.post( `/api/login`, async c => {
 
 app.post( `/api/logout`, signed_in, async c => {
     const { session_id, owner_id } = c.get( `session` )
-    await auth_of( c ).revoke( session_id )
     await sync_of( c.env, owner_id ).revoke( session_id )
+    await auth_of( c ).revoke( session_id )
     deleteCookie( c, cookie_name( c.req.url ), cookie_options( c.req.url ) )
     return c.json( { ok: true } )
 } )
@@ -92,12 +92,14 @@ app.post( `/api/pair`, signed_in, async c => c.json( await auth_of( c ).pair() )
 
 app.get( `/api/devices`, signed_in, async c => c.json( await auth_of( c ).sessions() ) )
 
-// Revoke: the session dies first, then its live sockets close (within one RPC round trip)
+// Revoke: fence + close sockets in Sync first, then kill the session. If either step fails, retrying
+// redoes both (each is idempotent), so a half-done revoke never leaves a live socket behind
 app.delete( `/api/devices/:id`, signed_in, async c => {
     const id = c.req.param( `id` )
-    const revoked = await auth_of( c ).revoke( id )
-    if( !revoked ) return c.json( { error: `No such device` }, 404 )
+    const known = ( await auth_of( c ).sessions() ).some( session => session.id === id )
+    if( !known ) return c.json( { error: `No such device` }, 404 )
     await sync_of( c.env, c.get( `session` ).owner_id ).revoke( id )
+    await auth_of( c ).revoke( id )
     return c.json( { ok: true } )
 } )
 

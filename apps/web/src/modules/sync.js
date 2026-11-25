@@ -18,6 +18,7 @@ const { set_account, set_sync_status } = use_app_store.getState()
 export const api = async ( path, { method = `GET`, body } = {} ) => {
     const response = await fetch( path, {
         method,
+        signal: AbortSignal.timeout( 10_000 ),
         headers: body ? { 'Content-Type': `application/json` } : undefined,
         body: body ? JSON.stringify( body ) : undefined,
     } )
@@ -87,6 +88,26 @@ export const begin_sync = async () => {
         },
     } )
 }
+
+// Sign-in / sign-out in one tab: the others follow (they share the cookie, not the connection)
+const account_channel = typeof BroadcastChannel === `undefined` ? null : new BroadcastChannel( `dolist:account` )
+export const announce_account_change = () => account_channel?.postMessage( `changed` )
+account_channel?.addEventListener( `message`, async () => {
+    const account = await refresh_account()
+    if( account?.signed_in ) return begin_sync()
+    end_sync()
+    set_sync_status( `off` )
+} )
+
+// Back after a while hidden (laptop sleep, phone lock): the socket may be silently dead, so start fresh
+const RESUME_AFTER = 60_000
+let hidden_at = 0
+document.addEventListener( `visibilitychange`, () => {
+    if( document.hidden ) return hidden_at = Date.now()
+    if( !connection || Date.now() - hidden_at < RESUME_AFTER ) return
+    connection.drop()
+    connection.retry_now()
+} )
 
 // Network gone: drop the socket (offline edits stay local); back: reconnect without waiting out the backoff
 window.addEventListener( `offline`, () => connection?.drop() )

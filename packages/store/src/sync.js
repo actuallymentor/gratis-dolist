@@ -35,12 +35,16 @@ export const start_sync = ( store, { url, on_status = () => {}, should_retry = a
         synchronizer = null
         if( stopped ) return
 
+        // Say so at once: the sign-in check below can take a while
+        if( code !== REVOKED ) on_status( `offline` )
         const retry = code !== REVOKED && await should_retry( { code } )
+
+        // The check is async: a newer connection (retry_now) or stop() may have happened meanwhile
+        if( stopped || socket ) return
         if( !retry ) {
             stopped = true
             return on_status( `stopped`, { code } )
         }
-        on_status( `offline` )
         timer = setTimeout( connect, delay )
         delay = Math.min( delay * 2, MAX_DELAY )
     }
@@ -67,9 +71,17 @@ export const start_sync = ( store, { url, on_status = () => {}, should_retry = a
         } )
         if( socket !== current || current.readyState !== 1 ) return
 
-        synchronizer = await createWsSynchronizer( store, current, REQUEST_TIMEOUT, undefined, undefined, undefined, FRAGMENT_SIZE )
+        // TinyBase reports timeouts and bad exchanges only here (startSync still resolves), so any of them
+        // means this connection can't be trusted: close it and let `ended` reconnect
+        let failed = false
+        const on_error = error => {
+            failed = true
+            console.warn( `dolist sync:`, error?.message ?? error )
+            if( socket === current ) current.close()
+        }
+        synchronizer = await createWsSynchronizer( store, current, REQUEST_TIMEOUT, undefined, undefined, on_error, FRAGMENT_SIZE )
         await synchronizer.startSync()
-        if( socket !== current ) return
+        if( socket !== current || failed ) return
         delay = MIN_DELAY
         on_status( `synced` )
     }

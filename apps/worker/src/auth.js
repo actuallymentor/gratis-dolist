@@ -10,7 +10,7 @@ const RECOVERY_CODES = 10
 const LAST_SEEN_EVERY = 5 * MINUTE
 
 const SCHEMA = `
-    CREATE TABLE IF NOT EXISTS owner ( id TEXT PRIMARY KEY, created INTEGER NOT NULL );
+    CREATE TABLE IF NOT EXISTS owner ( id TEXT PRIMARY KEY, created INTEGER NOT NULL, confirmed INTEGER );
     CREATE TABLE IF NOT EXISTS sessions ( id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, label TEXT, created INTEGER NOT NULL, last_seen INTEGER NOT NULL, revoked INTEGER );
     CREATE TABLE IF NOT EXISTS pairing ( code_hash TEXT PRIMARY KEY, expires INTEGER NOT NULL );
     CREATE TABLE IF NOT EXISTS recovery ( code_hash TEXT PRIMARY KEY );
@@ -39,6 +39,12 @@ export class Auth extends DurableObject {
         return this.rows( `SELECT id FROM owner` )[ 0 ]?.id ?? null
     }
 
+    // An owner counts once its first session has been used: until then the enrollment response may have
+    // been lost in transit (no cookie, no recovery codes), so enrollment stays open and starts over
+    confirmed() {
+        return !!this.rows( `SELECT confirmed FROM owner` )[ 0 ]?.confirmed
+    }
+
     // Too many wrong codes recently from this source: refuse before looking at the code.
     // Per source, so a stranger can't lock the owner out; the codes themselves are unguessable
     throttled( now, source ) {
@@ -62,7 +68,7 @@ export class Auth extends DurableObject {
      * @returns {boolean}
      */
     enrollable() {
-        return !this.owner() && !!this.env.ENROLLMENT_CODE
+        return !this.confirmed() && !!this.env.ENROLLMENT_CODE
     }
 
     /**
@@ -80,8 +86,10 @@ export class Auth extends DurableObject {
         const typed = normalize_code( code )
         const hash = await sha256( typed )
 
-        // Enrollment: closes for good once an owner exists
+        // Enrollment: closes for good once the owner's first session is used (see confirmed). A retry before
+        // that discards the unconfirmed attempt, which never synced anything
         if( this.enrollable() && hash === await sha256( normalize_code( this.env.ENROLLMENT_CODE ) ) ) {
+            for( const table of [ `owner`, `sessions`, `recovery`, `pairing` ] ) this.sql.exec( `DELETE FROM ${ table }` )
             this.sql.exec( `INSERT INTO owner ( id, created ) VALUES ( ?, ? )`, crypto.randomUUID(), now )
             const recovery_codes = Array.from( { length: RECOVERY_CODES }, () => random_code( 80 ) )
             for( const recovery of recovery_codes ) this.sql.exec( `INSERT INTO recovery ( code_hash ) VALUES ( ? )`, await sha256( normalize_code( recovery ) ) )
@@ -89,7 +97,7 @@ export class Auth extends DurableObject {
         }
 
         // Pairing + recovery codes are single-use: delete-then-check is atomic inside the DO
-        if( this.owner() ) {
+        if( this.confirmed() ) {
             const paired = this.sql.exec( `DELETE FROM pairing WHERE code_hash = ? AND expires > ? RETURNING code_hash`, hash, now ).toArray().length
             const recovered = !paired && this.sql.exec( `DELETE FROM recovery WHERE code_hash = ? RETURNING code_hash`, hash ).toArray().length
             if( paired || recovered ) return this.open_session( label, now )
@@ -109,6 +117,7 @@ export class Auth extends DurableObject {
         const [ session ] = this.rows( `SELECT id, last_seen FROM sessions WHERE token_hash = ? AND revoked IS NULL`, await sha256( token ) )
         if( !session ) return null
         const now = Date.now()
+        this.sql.exec( `UPDATE owner SET confirmed = ? WHERE confirmed IS NULL`, now )
         if( now - session.last_seen > LAST_SEEN_EVERY ) this.sql.exec( `UPDATE sessions SET last_seen = ? WHERE id = ?`, now, session.id )
         return { session_id: session.id, owner_id: this.owner() }
     }

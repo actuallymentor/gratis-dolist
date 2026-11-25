@@ -169,3 +169,28 @@ test( `a session revoked mid-reconnect stays out`, async ( { browser } ) => {
     await b.context.setOffline( false )
     await expect( b.page.getByText( `This device was signed out` ) ).toBeVisible( { timeout: 10_000 } )
 } )
+
+test( `signing in one tab starts sync in the other open tabs`, async ( { browser } ) => {
+    const a = await device( browser, owner() )
+    const sibling = await a.context.newPage()
+    await sibling.goto( `/settings` )
+    await enroll( a.page )
+    await expect( status( sibling ) ).toHaveText( `Synced` )
+} )
+
+test( `a lost enrollment response can be retried`, async ( { browser, request } ) => {
+    const tenant = owner()
+
+    // Enroll from outside the browser and drop the response (no cookie, no recovery codes)
+    const lost = await request.post( `/api/login`, { data: { code: ENROLLMENT_CODE }, headers: { Origin: `http://localhost:8787`, Cookie: `dolist_tenant=${ tenant }` } } )
+    expect( lost.status() ).toBe( 200 )
+
+    // The real browser enrolls again and gets a working owner
+    const a = await device( browser, tenant )
+    expect( await enroll( a.page ) ).toHaveLength( 10 )
+
+    // Now it's closed
+    const late = await device( browser, tenant )
+    await sign_in( late.page, ENROLLMENT_CODE )
+    await expect( late.page.getByText( `That code didn't work` ) ).toBeVisible()
+} )

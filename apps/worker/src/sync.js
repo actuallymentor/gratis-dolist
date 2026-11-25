@@ -20,12 +20,18 @@ export const REVOKED = 4401
 export class Sync extends WsServerDurableObject {
 
     createPersister() {
-        this.store = createMergeableStore()
+        // Same as clients: no skew guard, so a fast device's edits converge instead of vanishing
+        this.store = createMergeableStore( undefined, undefined, Infinity )
         return createDurableObjectSqlStoragePersister( this.store, this.ctx.storage.sql, { mode: `fragmented` }, undefined, error => this.onIgnoredError( error ) )
     }
 
     getFragmentSize() {
         return FRAGMENT_SIZE
+    }
+
+    // TinyBase drops a message whose fragments take longer than this (default 1 s): too tight for phones
+    getRequestTimeoutSeconds() {
+        return 30
     }
 
     // Each socket remembers its session so revoke can find it. Revoked sessions stay fenced out,
