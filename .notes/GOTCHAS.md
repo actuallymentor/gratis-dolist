@@ -17,5 +17,5 @@
 - `describe.skipIf` still runs the suite callback at collection: never read gitignored fixtures there unguarded.
 
 - **Edit buffers must follow the store.** A local `useState(task.x)` committed on close overwrites other tabs' newer edits. Use a buffer with a base (TaskDetail `use_field`): adopt stored changes unless the user holds an edit; settle after save.
-- **sessionStorage is copied** into duplicated / `window.open` tabs → "per-tab" ids collide. Verify uniqueness with a Web Lock `ifAvailable` (retry once for reload races).
+- **sessionStorage is copied** into duplicated / `window.open` tabs → "per-tab" ids collide. Verify uniqueness with a Web Lock `ifAvailable` (retry once for reload races); buffer draft writes in memory until the id is final.
 - **A failed IDB write loses its delta.** Incremental persister sets `repair_pending`; the next save merges full content. Don't just clear the error.

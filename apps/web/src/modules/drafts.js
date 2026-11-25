@@ -41,14 +41,26 @@ const tab_ready = navigator.locks ? try_hold()
         return hold( tab_id )
     } ) : Promise.resolve()
 
+// Until the tab id is final, writes wait in memory (a duplicated tab must not write under its opener's id)
+let id_final = false
+const pending = new Map()
+
 const key_of = ( name, tab = tab_id ) => `${ PREFIX }${ name }:${ tab }`
 
-export const read_draft = name => safe( () => localStorage.getItem( key_of( name ) ) ) || ``
+export const read_draft = name => pending.get( name ) ?? safe( () => localStorage.getItem( key_of( name ) ) ) ?? ``
 
-export const write_draft = ( name, text ) => safe( () => {
+const store_draft = ( name, text ) => safe( () => {
     if( text ) localStorage.setItem( key_of( name ), text )
     else localStorage.removeItem( key_of( name ) )
 } )
+
+tab_ready.then( () => {
+    id_final = true
+    pending.forEach( ( text, name ) => store_draft( name, text ) )
+    pending.clear()
+} )
+
+export const write_draft = ( name, text ) => id_final ? store_draft( name, text ) : pending.set( name, text )
 
 /**
  * Take over a dead tab's draft for `name`, if this tab has none. Resolves with the adopted text or ``.

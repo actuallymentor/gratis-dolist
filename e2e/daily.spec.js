@@ -245,11 +245,14 @@ test( `a tab opened from another gets its own draft`, async ( { page } ) => {
     await quick_add( page ).fill( `draft in opener` )
     const [ popup ] = await Promise.all( [ page.waitForEvent( `popup` ), page.evaluate( () => window.open( `/inbox` ) ) ] )
     await popup.waitForLoadState()
-    await popup.waitForTimeout( 500 )
+
+    // Typed straight away, before the popup has settled on its own id
     await quick_add( popup ).fill( `draft in popup` )
-    await page.waitForTimeout( 300 )
+    await popup.waitForTimeout( 600 )
     await page.reload()
     await expect( quick_add( page ) ).toHaveValue( `draft in opener` )
+    await popup.reload()
+    await expect( quick_add( popup ) ).toHaveValue( `draft in popup` )
 } )
 
 test( `a draft saved before per-tab keys is recovered`, async ( { page } ) => {
