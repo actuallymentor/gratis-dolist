@@ -1,9 +1,9 @@
 // Quick-add grammar v1 (plan §2.5): words first, cheap prefixes second, never corrupt a title.
 //
-//   dates      today · tomorrow · fri · next fri · next week · in 3 days · 12 nov · nov 12th · 2026-12-01
+//   dates      today · tomorrow · tom · fri · next fri · next week · in 3 days · 12 nov · nov 12th · 2026-12-01
 //              (numeric 12/11 is deliberately NOT a date: day/month order is ambiguous and titles hold fractions)
 //   deadline   by fri (inclusive) · before fri (the day before)
-//   time       at 3pm · at 15:00 · 3:30pm · at noon
+//   time       at 3pm · at 15:00 · 3:30pm · at noon · at 18 · at 09 · at 5 (bare 1–6 = afternoon)
 //   recurrence every day|weekday|mon|2 weeks|month on 31|year|1st sat|28 nov · every! 3 days (from completion)
 //   priority   !1–!4 or p1–p4, whole token only (`!!!` and `wow!1` stay text)
 //   project    #Errands · #"Two words" · #Work/Clients      label  @call · @"after work"
@@ -23,7 +23,7 @@ const BARE_DOW_SRC = String.raw`(?:mon(?:day)?|tue(?:s(?:day)?)?|wednesday|thu(?
 const COUNT_SRC = String.raw`(?:\d{1,3}|an?|one|two|three|four|five|six|seven|eight|nine|ten)`
 
 const date_src = dow => [
-    String.raw`today|tomorrow|tmrw?|tmr`,
+    String.raw`today|tomorrow|tmrw?|tmr|tom`,
     String.raw`next\s+(?:week|month|year)`,
     String.raw`this\s+weekend`,
     String.raw`(?:next|this)\s+${ DOW_SRC }`,
@@ -36,7 +36,10 @@ const date_src = dow => [
 
 const DATE_SRC = date_src( BARE_DOW_SRC )
 const PREFIXED_DATE_SRC = date_src( DOW_SRC )
-const TIME_SRC = String.raw`(?:noon|midnight|\d{1,2}(?::\d{2})?\s?(?:am|pm)|\d{1,2}:\d{2})`
+const TIME_SRC = String.raw`(?:noon|midnight|\d{1,2}(?::\d{2})?\s?(?:am|pm)|\d{1,2}:\d{2}|\d{1,2})`
+
+// `tom` means tomorrow, but capitalised `Tom` is a name ("Call Tom at 5")
+const names_tom = phrase => /\bTom\b/.test( phrase )
 
 const WORD_COUNTS = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
 
@@ -65,7 +68,7 @@ const count_of = word => WORD_COUNTS[ word ] ?? Number( word )
 // [ regex, ( match, today, week_start ) => iso ], tried in order on the normalised phrase
 const PHRASES = [
     [ /^today$/, ( _, today ) => today ],
-    [ /^(?:tomorrow|tmrw?|tmr)$/, ( _, today ) => add_days( today, 1 ) ],
+    [ /^(?:tomorrow|tmrw?|tmr|tom)$/, ( _, today ) => add_days( today, 1 ) ],
     [ /^next week$/, ( _, today, week_start ) => add_days( start_of_week( today, week_start ), 7 ) ],
     [ /^next month$/, ( _, today ) => add_months( `${ today.slice( 0, 7 ) }-01`, 1 ) ],
     [ /^next year$/, ( _, today ) => `${ Number( today.slice( 0, 4 ) ) + 1 }-01-01` ],
@@ -125,7 +128,9 @@ export const resolve_time_phrase = phrase => {
     const [ hour, minute ] = [ Number( hour_text ), Number( minute_text ) ]
     if( minute > 59 || hour > ( meridiem ? 12 : 23 ) || meridiem && hour === 0 ) return null
 
-    const hour_24 = meridiem ? hour % 12 + ( meridiem === `pm` ? 12 : 0 ) : hour
+    // A bare `at 5` is the afternoon (nobody plans 05:00 without saying so); `at 05` / `at 7` / `at 18` are as written
+    const bare_afternoon = !meridiem && !match[ 2 ] && /^[1-6]$/.test( hour_text )
+    const hour_24 = meridiem ? hour % 12 + ( meridiem === `pm` ? 12 : 0 ) : bare_afternoon ? hour + 12 : hour
     return `${ String( hour_24 ).padStart( 2, `0` ) }:${ minute_text }`
 }
 
@@ -184,17 +189,20 @@ const RULES = [
     } },
 
     { type: `deadline`, regex: new RegExp( `${ B }(?:by|before)\\s+(?:${ PREFIXED_DATE_SRC })${ E }`, `gi` ), read: ( match, { today, week_start } ) => {
+        if( names_tom( match[ 0 ] ) ) return null
         const date = resolve_date_phrase( match[ 0 ], today, week_start )
         if( !date ) return null
         return { value: /^before/i.test( match[ 0 ] ) ? add_days( date, -1 ) : date }
     } },
 
+    // Bare `at 5` is flagged: it only counts at the end or right before other grammar (see drop_loose_hours)
     { type: `time`, regex: new RegExp( `${ B }(?:at\\s+${ TIME_SRC }|\\d{1,2}(?::\\d{2})?\\s?(?:am|pm))${ E }`, `gi` ), read: match => {
         const time = resolve_time_phrase( match[ 0 ] )
-        return time && { value: time }
+        return time && { value: time, .../^at\s+\d{1,2}$/i.test( match[ 0 ] ) && { bare: true } }
     } },
 
     { type: `date`, regex: new RegExp( `${ B }(?:on\\s+(?:${ PREFIXED_DATE_SRC })|${ DATE_SRC })${ E }`, `gi` ), read: ( match, { today, week_start } ) => {
+        if( names_tom( match[ 0 ] ) ) return null
         const date = resolve_date_phrase( match[ 0 ], today, week_start )
         return date && { value: date }
     } },
@@ -229,6 +237,15 @@ const mask_text = ( text, extra_ranges ) => {
     return text.split( `` ).map( ( char, index ) => ranges.some( ( [ start, end ] ) => index >= start && index < end ) ? MASK : char ).join( `` )
 }
 
+// "Meet at 5 shops" is a count, "Call tom at 5" / "at 5 tom" a time: a bare hour must end the text or touch another token
+const drop_loose_hours = ( text, spans ) => spans.filter( ( span, index ) => {
+    if( !span.bare ) return true
+    const rest = text.slice( span.end )
+    const gap = rest.length - rest.trimStart().length
+    const next = spans[ index + 1 ]
+    return !rest.trim() || /^[,.;!?)]/.test( rest ) || next?.start === span.end + gap
+} ).map( ( { bare, ...span } ) => span )
+
 // Run every rule over the masked text; first claim wins, overlaps are skipped
 const scan = ( text, ctx, literal_ranges ) => {
 
@@ -243,7 +260,7 @@ const scan = ( text, ctx, literal_ranges ) => {
         if( result ) spans.push( { type, start, end, raw: text.slice( start, end ), ...result } )
     } ) )
 
-    return spans.sort( ( a, b ) => a.start - b.start )
+    return drop_loose_hours( text, spans.sort( ( a, b ) => a.start - b.start ) )
 }
 
 /* ---------------------------------------------------------------------------

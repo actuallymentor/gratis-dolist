@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 
 const ROWS = [
-    [ `fri`, `Scheduled date: today, tomorrow, mon…sun, 12 nov, in 3 days, next week` ],
+    [ `fri`, `Scheduled date: today, tom(orrow), mon…sun, 12 nov, in 3 days, next week` ],
     [ `by fri`, `Deadline (inclusive). before fri = the day before` ],
-    [ `at 3pm`, `Time` ],
+    [ `at 3pm`, `Time: at 18, at 09:30, at 5 (= 17:00)` ],
     [ `every week`, `Repeats from the scheduled date. every! = from completion` ],
     [ `!1 … !4`, `Priority (p1 … p4 also work)` ],
     [ `#home`, `Project. #"Two words" for spaces` ],
@@ -12,7 +12,16 @@ const ROWS = [
     [ `"by the sea"`, `Quoted text stays in the title` ],
 ]
 
-const KEYS = [ [ `?`, `This sheet` ], [ `/`, `Search` ], [ `n`, `Focus quick add` ], [ `m`, `Move focused card (Horizons)` ], [ `Esc`, `Close` ] ]
+const KEYS = [
+    [ `n`, `New task, from anywhere` ],
+    [ `j / k`, `Next / previous task` ],
+    [ `Enter`, `Open selected task` ],
+    [ `e`, `Complete selected task` ],
+    [ `m`, `Move selected task (Horizons)` ],
+    [ `/`, `Search` ],
+    [ `?`, `This sheet` ],
+    [ `Esc`, `Close` ],
+]
 
 const Sheet = styled.div`
     position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; background: #1a1a2e40;

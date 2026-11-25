@@ -15,10 +15,10 @@ const Card = styled.article`
     &[data-leaving] { opacity: 0; transform: translateX( 8px ) }
     &[draggable="true"] { cursor: grab }
 
-    .title {
-        all: unset; cursor: pointer; font-size: .95rem; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere;
-        &:focus-visible { box-shadow: 0 0 0 5px var(--accent-tint); border-radius: 4px }
-    }
+    .title { all: unset; cursor: pointer; font-size: .95rem; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere }
+
+    /* Keyboard selection (j/k, Tab) lights the whole card */
+    &:has( .title:focus-visible ) { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint) }
     .move {
         all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -.35rem -.4rem 0 0;
         border-radius: 999px; color: var(--faint); opacity: 0; transition: opacity 160ms var(--ease);

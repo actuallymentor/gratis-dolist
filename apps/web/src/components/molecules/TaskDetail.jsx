@@ -1,32 +1,29 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Trash2, X } from 'lucide-react'
 import { parse_quick_add } from '@dolist/core'
-import { add_task, delete_task, restore_task, set_labels, update_task } from '@dolist/store'
+import { add_task, delete_task, get_projects, restore_task, set_labels, update_task } from '@dolist/store'
 import { use_labels, use_projects, use_store, use_tasks } from '@dolist/store/react'
 import toast from 'react-hot-toast'
 import TaskCard from './TaskCard'
+import Modal from '../atoms/Modal'
+import ShorthandField from '../atoms/ShorthandField'
 import { use_today } from '../../hooks/use_today'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { use_app_store } from '../../stores/app'
 import { flush } from '../../modules/dolist'
 
-const Panel = styled.aside`
-    position: fixed; inset: 0 0 0 auto; z-index: 30; width: min( 30rem, 100% );
-    display: flex; flex-direction: column; gap: 1rem; padding: 1.25rem 1.25rem 2rem; overflow-y: auto;
-    background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 32px #1a1a2e14;
-    animation: enter 500ms cubic-bezier( .2, .8, .2, 1 );
+const Panel = styled( Modal )`
+    display: flex; flex-direction: column; gap: 1rem; padding: .75rem 1.25rem 1.5rem;
 
-    @keyframes enter { from { opacity: 0; transform: translateX( 8px ) } }
-
-    header { display: flex; align-items: center; gap: .5rem; justify-content: flex-end }
+    header { display: flex; align-items: center; gap: .25rem; margin-right: -.5rem }
+    header .title { flex: 1; font: 500 1.25rem var(--font-head) }
     header button, .danger {
         all: unset; cursor: pointer; display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; border-radius: 999px; color: var(--muted);
         &:hover { background: var(--sunk); color: var(--fg) }
         &:focus-visible { box-shadow: 0 0 0 5px var(--accent-tint) }
     }
 
-    .title { font: 500 1.25rem/1.35 var(--font-head); border: 0; background: none; padding: .25rem 0; width: 100%; outline: none; resize: none }
     textarea.notes { font: inherit; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--page); padding: .6rem .75rem; min-height: 6rem; resize: vertical }
 
     dl { display: grid; grid-template-columns: 7rem 1fr; gap: .35rem .75rem; align-items: center; margin: 0 }
@@ -43,6 +40,31 @@ const Panel = styled.aside`
     .subs form input { width: 100%; min-height: 40px; padding: 0 .6rem; border-radius: var(--radius-sm); border: 1px dashed var(--line); background: none }
     .danger { color: var(--bad); padding: 0 1rem; justify-self: start; gap: .4rem; display: inline-flex; align-items: center }
 `
+
+/**
+ * Reads shorthand typed into an edited title. Unknown #project / @label stay in the title as written
+ * (the detail never creates names silently), so they're re-parsed as literal ranges.
+ */
+const parse_title = ( text, ctx ) => {
+    const first = parse_quick_add( text, ctx )
+    const unknown = first.spans.filter( ( { unknown } ) => unknown ).map( ( { start, end } ) => [ start, end ] )
+    const { task } = unknown.length ? parse_quick_add( text, { ...ctx, literal_ranges: unknown } ) : first
+    return { task, spans: first.spans.filter( ( { type } ) => type !== `literal` ) }
+}
+
+// Only what the title's shorthand actually said; a bare time keeps an existing date
+const shorthand_patch = ( task, { task: parsed, spans }, project_id_of ) => {
+    const has = type => spans.some( span => span.type === type && !span.unknown )
+    return {
+        ...( has( `date` ) || has( `recur` ) || has( `time` ) && !task.scheduled ) && { scheduled: parsed.scheduled },
+        ...has( `time` ) && { time: parsed.time },
+        ...has( `deadline` ) && { deadline: parsed.deadline },
+        ...has( `priority` ) && { priority: parsed.priority },
+        ...has( `recur` ) && { recur: parsed.recur },
+        ...has( `project` ) && { project_id: project_id_of( parsed.project ) },
+        ...has( `label` ) && { labels: [ ...new Set( [ ...task.labels || [], ...parsed.labels ] ) ] },
+    }
+}
 
 const PRIORITIES = [ [ ``, `None` ], [ `1`, `!1 Urgent` ], [ `2`, `!2 High` ], [ `3`, `!3 Medium` ], [ `4`, `!4 Low` ] ]
 
@@ -98,11 +120,23 @@ export default function TaskDetail( { task, on_close } ) {
     const subtasks = all_tasks.filter( ( { parent_id } ) => parent_id === task.id )
     const save = patch => update_task( store, task.id, patch )
 
+    // Shorthand in an edited title is highlighted while typing, then applied and stripped on save
+    const parse_ctx = () => ( {
+        today,
+        now: new Date().toTimeString().slice( 0, 5 ),
+        projects: projects.map( ( { name } ) => name ),
+        labels: labels.map( ( { name } ) => name ),
+    } )
+    const title_parse = useMemo( () => title_dirty ? parse_title( title, parse_ctx() ) : { spans: [] }, [ title, title_dirty, today, projects, labels ] ) // parse_ctx is recreated per render
+    const project_id_of = name => get_projects( store ).find( project => project.name.toLowerCase() === name?.toLowerCase() )?.id ?? null
+
     // Each committer writes only what the user edited here
     const save_title = () => {
         if( !title_dirty || !title.trim() ) return
-        save( { title: title.trim() } )
-        settle_title( title.trim() )
+        const parsed = parse_title( title, parse_ctx() )
+        const clean = parsed.task.title.trim() || task.title
+        save( { title: clean, ...shorthand_patch( task, parsed, project_id_of ) } )
+        settle_title( clean )
     }
     const save_notes = () => {
         if( !notes_dirty ) return
@@ -184,16 +218,15 @@ export default function TaskDetail( { task, on_close } ) {
         >Undo</button></span> )
     }
 
-    return <Panel ref={ panel_ref } tabIndex={ -1 } aria-label={ `Task: ${ task.title }` } role="dialog">
+    return <Panel ref={ panel_ref } label={ `Task: ${ task.title }` } on_close={ on_close } width="38rem">
         <header>
+            <ShorthandField className="title" value={ title } spans={ title_parse.spans } aria-label="Title"
+                onChange={ ( { target: { value } } ) => set_title( value ) }
+                onBlur={ save_title }
+                onKeyDown={ event => event.key === `Enter` && event.currentTarget.blur() }
+            />
             <button onClick={ on_close } aria-label="Close"><X size={ 20 } strokeWidth={ 1.5 } /></button>
         </header>
-
-        <input className="title" value={ title } aria-label="Title"
-            onChange={ ( { target: { value } } ) => set_title( value ) }
-            onBlur={ save_title }
-            onKeyDown={ event => event.key === `Enter` && event.currentTarget.blur() }
-        />
 
         <textarea className="notes" value={ notes } placeholder="Notes" aria-label="Notes"
             onChange={ ( { target: { value } } ) => set_notes( value ) }

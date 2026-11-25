@@ -23,3 +23,8 @@
 - gratis.sh has no `cf-bounce` MX/SPF or `_dmarc` records ⇒ not onboarded for Email *Sending* (Routing ≠ Sending). Fix: dash → Compute → Email Service → Email Sending → Onboard Domain → gratis.sh, same account as the Worker.
 - Prod smoke left 3 throwaway passkey-only accounts (no email, no tasks).
 - 2026-11-25 later: RESOLVED — gratis.sh onboarded for Email Sending (cf-bounce MX/SPF + DMARC live); prod /api/email-link → 200. Inbox delivery not verified by agent (no inbox access).
+
+## 2026-11-25 — Shorthand calls made autonomously
+- Bare `at 1`–`at 6` = afternoon (13–18h); `at 7`+ and leading zero (`at 05`) as written. Flip if you think in 24h only.
+- Bare `at N` only counts at the end or touching other shorthand (`Meet at 5 shops` stays text).
+- `tom` = tomorrow, but capitalised `Tom` is a name (`Call Tom at 5` → only the time parses).

@@ -12,6 +12,7 @@ import InstallPill from './components/molecules/InstallPill'
 import UpdateBadge from './components/molecules/UpdateBadge'
 import Cheatsheet from './components/molecules/Cheatsheet'
 import OpenTask from './components/molecules/OpenTask'
+import QuickAddModal from './components/molecules/QuickAddModal'
 import { use_task_actions } from './hooks/use_task_actions'
 import { use_shortcuts } from './hooks/use_shortcuts'
 import { dolist } from './modules/dolist'
@@ -24,6 +25,7 @@ function Overlays() {
     use_shortcuts()
     return <>
         <OpenTask open_id={ open_id } on_close={ on_close } />
+        <QuickAddModal />
         <Cheatsheet />
     </>
 }

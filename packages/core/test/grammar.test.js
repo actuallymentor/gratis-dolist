@@ -18,6 +18,7 @@ describe( `dates (§2.4 contract table)`, () => {
         [ `today`, today ],
         [ `tomorrow`, `2026-11-25` ],
         [ `tmr`, `2026-11-25` ],
+        [ `tom`, `2026-11-25` ],
         [ `fri`, `2026-11-27` ],
         [ `friday`, `2026-11-27` ],
         [ `tue`, `2026-12-01` ],
@@ -64,6 +65,27 @@ describe( `dates (§2.4 contract table)`, () => {
         expect( task_of( `x at noon` ).time ).toBe( `12:00` )
         expect( resolve_time_phrase( `12am` ) ).toBe( `00:00` )
         expect( resolve_time_phrase( `13pm` ) ).toBe( null )
+    } )
+
+    it( `reads bare hours after "at" (1–6 = afternoon, leading zero = as written)`, () => {
+        expect( task_of( `x at 18` ).time ).toBe( `18:00` )
+        expect( task_of( `x at 09` ).time ).toBe( `09:00` )
+        expect( task_of( `x at 5` ).time ).toBe( `17:00` )
+        expect( task_of( `x at 05` ).time ).toBe( `05:00` )
+        expect( task_of( `x at 7` ).time ).toBe( `07:00` )
+        expect( task_of( `x at 24` ) ).toMatchObject( { time: null, title: `x at 24` } )
+        expect( task_of( `buy 5 apples` ).title ).toBe( `buy 5 apples` )
+    } )
+
+    it( `reads everyday shorthand combos`, () => {
+        expect( task_of( `Call tom at 5` ) ).toMatchObject( { title: `Call`, scheduled: `2026-11-25`, time: `17:00` } )
+        expect( task_of( `Gym fri at 18` ) ).toMatchObject( { title: `Gym`, scheduled: `2026-11-27`, time: `18:00` } )
+        expect( task_of( `Standup every mon at 09` ) ).toMatchObject( { title: `Standup`, scheduled: `2026-11-30`, time: `09:00`, recur: { freq: `week`, by_day: [ 1 ] } } )
+    } )
+
+    it( `capitalised Tom is a name, not tomorrow`, () => {
+        expect( task_of( `Call Tom at 5`, { now: `10:00` } ) ).toMatchObject( { title: `Call Tom`, scheduled: today, time: `17:00` } )
+        expect( task_of( `Lunch by Tom` ) ).toMatchObject( { title: `Lunch by Tom`, deadline: null } )
     } )
 
     it( `repeated tokens: last wins, all flagged`, () => {

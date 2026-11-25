@@ -6,15 +6,12 @@ import { add_label, add_project, add_task, get_projects } from '@dolist/store'
 import { use_labels, use_projects, use_store } from '@dolist/store/react'
 import toast from 'react-hot-toast'
 import Chip from '../atoms/Chip'
+import ShorthandField from '../atoms/ShorthandField'
 import { use_app_store } from '../../stores/app'
 import { use_today } from '../../hooks/use_today'
 import { flush } from '../../modules/dolist'
 import { adopt_orphan_draft, read_draft as read_saved, write_draft as write_saved } from '../../modules/drafts'
 
-// This tab's quick-add draft (see modules/drafts.js)
-const DRAFT = `quick-add`
-const read_draft = () => read_saved( DRAFT )
-const write_draft = text => write_saved( DRAFT, text )
 
 const Box = styled.form`
     border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
@@ -23,17 +20,7 @@ const Box = styled.form`
 
     &:focus-within { box-shadow: 0 0 0 5px var(--accent-tint); border-color: var(--accent) }
 
-    .line { display: flex; align-items: center; gap: .55rem; color: var(--faint) }
-    .field { position: relative; flex: 1; min-width: 0 }
-    .field input, .field .hl { font: 500 1rem/1.5 var(--font-body); padding: .25rem 0; width: 100%; border: 0; white-space: pre; letter-spacing: normal }
-    .field input { position: relative; z-index: 1; background: transparent; color: transparent; caret-color: var(--fg); outline: none }
-
-    /* The box's focus-within ring is the focus signal; no second ring on the bare input */
-    .field input:focus-visible { box-shadow: none }
-    .field input::placeholder { color: var(--faint) }
-    .field .hl { position: absolute; inset: 0; pointer-events: none; color: var(--fg); overflow: hidden }
-    .hl mark { background: none; color: var(--accent-strong) }
-    .hl mark[data-unknown] { color: var(--muted); text-decoration: underline dotted }
+    .line { display: flex; align-items: center; gap: .55rem; color: var(--faint); font: 500 1rem var(--font-body) }
 
     .accessory { display: flex; gap: .4rem; padding: .45rem 0 .1rem 1.6rem; overflow-x: auto }
     .accessory button, .accessory label {
@@ -53,26 +40,12 @@ const ICONS = { date: CalendarDays, deadline: Flag, time: Clock, recur: Repeat, 
 const chip_text = ( { type, value, raw }, today ) => {
     if( type === `date` ) return resolve_date_label( value, today )
     if( type === `deadline` ) return `by ${ resolve_date_label( value, today ) }`
+    if( type === `time` ) return value
     if( type === `priority` ) return `!${ value }`
     if( type === `project` ) return `#${ value }`
     if( type === `label` ) return `@${ value }`
     if( type === `field` ) return raw
     return raw
-}
-
-// Split text into plain + highlighted segments for the overlay
-const segments_of = ( text, spans ) => {
-    const sorted = [ ...spans ].filter( ( { type } ) => type !== `literal` ).sort( ( a, b ) => a.start - b.start )
-    const parts = []
-    let cursor = 0
-    for( const span of sorted ) {
-        if( span.start < cursor ) continue
-        if( span.start > cursor ) parts.push( { text: text.slice( cursor, span.start ) } )
-        parts.push( { text: text.slice( span.start, span.end ), span } )
-        cursor = span.end
-    }
-    if( cursor < text.length ) parts.push( { text: text.slice( cursor ) } )
-    return parts
 }
 
 /**
@@ -86,8 +59,10 @@ const segments_of = ( text, spans ) => {
  * @param {boolean} [props.autofocus]
  * @param {boolean} [props.accessory] - show the touch accessory row ( # @ ! by 📅 )
  * @param {Function} [props.on_added] - called with the saved task's title once it's on disk
+ * @param {Function} [props.on_submit] - called right after the task is handed to the store (e.g. close a modal)
+ * @param {string} [props.draft] - draft slot name; separate capture surfaces keep separate drafts
  */
-export default function QuickAdd( { defaults = {}, placeholder = `Add a task… try "Call mum fri by sun !2 #home"`, autofocus, accessory, on_added } ) {
+export default function QuickAdd( { defaults = {}, placeholder = `Add a task… try "Call mum tom at 5 #home"`, autofocus, accessory, on_added, on_submit, draft = `quick-add`, className } ) {
 
     const store = use_store()
     const projects = use_projects()
@@ -95,16 +70,19 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const today = use_today()
     const mark_unsaved = use_app_store( state => state.mark_unsaved )
 
+    // This tab's draft for this surface (see modules/drafts.js)
+    const read_draft = () => read_saved( draft )
+    const write_draft = value => write_saved( draft, value )
+
     const id = useId()
     const input_ref = useRef( null )
-    const hl_ref = useRef( null )
     const [ text, set_text ] = useState( read_draft )
     const [ confirm_create, set_confirm_create ] = useState( false )
     const last_text = useRef( text )
 
     // A tab that closed with unsent text hands it to the next one opened
     useEffect( () => {
-        if( !text ) adopt_orphan_draft( DRAFT ).then( adopted => adopted && set_text( adopted ) )
+        if( !text ) adopt_orphan_draft( draft ).then( adopted => adopted && set_text( adopted ) )
     }, [] )  
 
     // Wall-clock now (HH:MM), so "at 3pm" typed after 3pm rolls to tomorrow
@@ -162,6 +140,7 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
         set_text( `` )
         set_confirm_create( false )
         input_ref.current?.focus()
+        on_submit?.( task )
 
         // Clear the saved draft only once committed, and only if it's still ours (another tab may have its own)
         flush()
@@ -175,11 +154,6 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const change = ( { target: { value } } ) => {
         set_text( value )
         set_confirm_create( false )
-    }
-
-    // Keep the overlay scrolled with the input when text overflows
-    const sync_scroll = () => {
-        if( hl_ref.current && input_ref.current ) hl_ref.current.scrollLeft = input_ref.current.scrollLeft
     }
 
     // Place the caret after the inserted token once React has rendered the new value
@@ -208,28 +182,19 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
 
     const chips = parsed.spans.filter( ( { type } ) => type !== `literal` )
 
-    return <Box onSubmit={ submit } aria-label="Quick add">
+    return <Box onSubmit={ submit } aria-label="Quick add" className={ className }>
         <div className="line">
             <Plus size={ 18 } strokeWidth={ 1.5 } aria-hidden />
-            <div className="field">
-                <div className="hl" ref={ hl_ref } aria-hidden>
-                    { segments_of( text, parsed.spans ).map( ( { text: part, span }, index ) => span
-                        ? <mark key={ index } data-unknown={ span.unknown || undefined }>{ part }</mark>
-                        : <span key={ index }>{ part }</span> ) }
-                </div>
-                <input
-                    ref={ input_ref }
-                    value={ text }
-                    onChange={ change }
-                    onScroll={ sync_scroll }
-                    onKeyUp={ sync_scroll }
-                    placeholder={ placeholder }
-                    aria-label="New task"
-                    autoFocus={ autofocus }
-                    autoComplete="off"
-                    enterKeyHint="done"
-                />
-            </div>
+            <ShorthandField
+                ref={ input_ref }
+                value={ text }
+                spans={ parsed.spans }
+                onChange={ change }
+                placeholder={ placeholder }
+                aria-label="New task"
+                autoFocus={ autofocus }
+                enterKeyHint="done"
+            />
         </div>
         { accessory && <div className="accessory" role="toolbar" aria-label="Insert">
             <button type="button" onPointerDown={ keep_focus } onClick={ () => insert( `#` ) } aria-label="Project">#</button>
