@@ -69,8 +69,6 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
     // store memory == disk, so that rewrite (~1 s at 4x CPU for 10k tasks) is skipped.
     let just_loaded = false
 
-    // A full save may only replace disk once memory is known to mirror it (a load succeeded)
-    let loaded = false
     let last_load_error = null
 
     // A failed write lost its changes; the next save rewrites everything (merged, never cleared) to repair disk
@@ -87,7 +85,6 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
             request( tx.objectStore( VALS ).getAllKeys() ),
             request( tx.objectStore( VALS ).getAll() ),
         ] )
-        loaded = true
         last_load_error = null
         if( !keys.length && !value_keys.length ) return undefined
         just_loaded = store.getRowCount( `tasks` ) === 0
@@ -146,21 +143,11 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
                 vals.put( [ value, hlc, getCellHash( value, hlc ) ], [ ``, value_id ] )
             } )
 
-        } else if( loaded && !repairing ) {
-
-            // Full save: mergeable content already carries hashes
-            const [ [ tables ], [ values ] ] = get_content()
-            rows.clear()
-            vals.clear()
-            Object.entries( tables ).forEach( ( [ table_id, [ table_rows ] ] ) => {
-                Object.entries( table_rows ).forEach( ( [ row_id, [ cells, , hash ] ] ) => rows.put( { c: cells, h: hash }, [ table_id, row_id ] ) )
-            } )
-            Object.entries( values ).forEach( ( [ value_id, stamp ] ) => vals.put( stamp, [ ``, value_id ] ) )
-
         } else {
 
-            // Repair, or full save without a successful load: disk may hold rows memory never saw (failed read),
-            // so merge cell by cell and never clear. An empty store then writes nothing.
+            // Full save or repair: always merge cell by cell, never clear. Disk may hold rows this tab's memory
+            // hasn't seen (another tab's commit not yet broadcast, a failed read); clearing would delete them.
+            // An empty store then writes nothing.
             const [ [ tables ], [ values ] ] = get_content()
             Object.entries( tables ).forEach( ( [ table_id, [ table_rows ] ] ) => {
                 Object.entries( table_rows ).forEach( ( [ row_id, [ cells ] ] ) => merge_row( rows, [ table_id, row_id ], cells ) )

@@ -16,9 +16,12 @@ const { set_account, set_sync_status } = use_app_store.getState()
  * @returns {Promise<Object>}
  */
 export const api = async ( path, { method = `GET`, body } = {} ) => {
+
+    // Reads give up fast (sync state must not hang); writes like sign-in get longer: aborting one on a slow
+    // network can burn a single-use code
     const response = await fetch( path, {
         method,
-        signal: AbortSignal.timeout( 10_000 ),
+        signal: AbortSignal.timeout( method === `GET` ? 10_000 : 30_000 ),
         headers: body ? { 'Content-Type': `application/json` } : undefined,
         body: body ? JSON.stringify( body ) : undefined,
     } )

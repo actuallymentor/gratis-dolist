@@ -4,9 +4,11 @@ import { expect, test } from '@playwright/test'
 
 const quick_add = page => page.getByRole( `textbox`, { name: `New task` } )
 
+// Waits for the durable ack: the saved draft is cleared only once the task is committed to IndexedDB
 const add = async ( page, text ) => {
     await quick_add( page ).fill( text )
     await quick_add( page ).press( `Enter` )
+    await expect.poll( () => page.evaluate( () => localStorage.getItem( `dolist:draft:quick-add:${ sessionStorage.getItem( `dolist:tab` ) }` ) ) ).toBe( null )
 }
 
 test( `capture with grammar lands in the right lists`, async ( { page } ) => {

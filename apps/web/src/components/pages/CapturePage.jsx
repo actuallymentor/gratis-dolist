@@ -22,12 +22,11 @@ const read_share = () => {
 }
 const write_share = share => write_draft( SHARE, share ? JSON.stringify( share ) : `` )
 
-// One share, one task: the id comes from the share itself, so a retry, a cloned tab or the share reopened
-// from history all land on the same task (FNV-1a, hex)
-const share_id = source => {
-    let hash = 0x811c9dc5
-    for( const char of source ) hash = Math.imul( hash ^ char.codePointAt( 0 ), 0x01000193 ) >>> 0
-    return `share-${ hash.toString( 16 ) }-${ source.length.toString( 16 ) }`
+// One share, one task: the id comes from the share itself (SHA-256), so a retry, a cloned tab or the share
+// reopened from history all land on the same task
+const share_id = async source => {
+    const digest = await crypto.subtle.digest( `SHA-256`, new TextEncoder().encode( source ) )
+    return `share-${ [ ...new Uint8Array( digest ) ].slice( 0, 16 ).map( byte => byte.toString( 16 ).padStart( 2, `0` ) ).join( `` ) }`
 }
 
 const Added = styled.ul`
@@ -96,11 +95,16 @@ export default function CapturePage() {
         const title = share.title.trim()
         if( !title || saving ) return
         set_saving( true )
-        add_task( store, { id: share_id( share.source ?? `${ share.title }\n${ share.notes }` ), title, notes: share.notes || undefined } )
+        const id = await share_id( share.source ?? `${ share.title }\n${ share.notes }` )
+
+        // Already added (and maybe edited since): leave it exactly as it is
+        const exists = store.hasRow( `tasks`, id )
+        if( !exists ) add_task( store, { id, title, notes: share.notes || undefined } )
         try {
             await flush()
             remember( title )
             clear_share()
+            if( exists ) toast( `Already in your tasks` )
         } catch {
             toast( `Couldn't save it on this device. Try again once storage frees up.` )
         } finally {

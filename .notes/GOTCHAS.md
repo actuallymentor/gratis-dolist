@@ -32,3 +32,4 @@
 - **Floating pills cover mobile content** (bottom-left sits on lists/details). Keep persistent hints inline (Settings), pills only for transient actions.
 - **Idempotency beats per-tab guards.** Shares get a content-derived task id (`share-<fnv>`), so retries, history and cloned tabs can't duplicate. Re-adding rewrites the row (reopens a completed one).
 - **A retry with unchanged data never triggers autosave.** `flush()` forces a repair save when the persister has a failed write pending.
+- **WebKit e2e stall under load:** with 8 parallel workers, ~1 run in 5 a WebKit `/api/login` POST to wrangler dev never completes (absent from the trace's network log, which only lists finished requests). Never alone (12/12), never Chromium. iphone project has `retries: 1`. Fixed along the way: leaked test contexts (close in afterEach), `add()` waits for the durable ack, 3 MB test in its own `heavy` project, local workers 8.

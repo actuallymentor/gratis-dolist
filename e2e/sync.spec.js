@@ -5,15 +5,23 @@ import { ENROLLMENT_CODE } from '../playwright.config.js'
 // Each test is its own owner: the E2E-only `dolist_tenant` cookie picks an isolated Auth DO.
 
 const quick_add = page => page.getByRole( `textbox`, { name: `New task` } )
+// Waits for the durable ack: the saved draft is cleared only once the task is committed to IndexedDB
 const add = async ( page, text ) => {
     await quick_add( page ).fill( text )
     await quick_add( page ).press( `Enter` )
+    await expect.poll( () => page.evaluate( () => localStorage.getItem( `dolist:draft:quick-add:${ sessionStorage.getItem( `dolist:tab` ) }` ) ) ).toBe( null )
 }
 const status = page => page.getByLabel( `Sync status` )
 
-// A browser of this test's owner
+// A browser of this test's owner. Closed after each test: open sockets pile up otherwise, and WebKit's
+// per-host connection pool runs dry (later requests just queue)
+const opened = []
+test.afterEach( async () => {
+    await Promise.all( opened.splice( 0 ).map( context => context.close() ) )
+} )
 const device = async ( browser, tenant ) => {
     const context = await browser.newContext()
+    opened.push( context )
     await context.addCookies( [ { name: `dolist_tenant`, value: tenant, url: `http://localhost:8787` } ] )
     return { context, page: await context.newPage() }
 }
@@ -131,28 +139,6 @@ test( `the API refuses other origins and signed-out callers`, async ( { request 
     expect( ( await request.post( `/api/login`, { data: { code: ENROLLMENT_CODE }, headers: { Origin: `https://evil.example` } } ) ).status() ).toBe( 403 )
     expect( ( await request.get( `/api/devices` ) ).status() ).toBe( 401 )
     expect( ( await request.get( `/api/snapshots` ) ).status() ).toBe( 401 )
-} )
-
-test( `a first sync well over 1 MB arrives complete`, async ( { browser }, { project } ) => {
-    test.skip( project.name !== `desktop`, `payload size is browser-independent` )
-    const tenant = owner()
-    const a = await device( browser, tenant )
-    await enroll( a.page )
-
-    // ~3 MB of tasks with notes, imported on A while it syncs
-    const tasks = Object.fromEntries( Array.from( { length: 3_000 }, ( _, i ) => [ `bulk-${ i }`, { title: `Bulk ${ i }`, notes: `x`.repeat( 600 ), created_at: 1_700_000_000_000 + i } ] ) )
-    const file = test.info().outputPath( `bulk.json` )
-    await import( `node:fs` ).then( fs => fs.writeFileSync( file, JSON.stringify( { app: `dolist`, schema: 1, tables: { tasks } } ) ) )
-    await a.page.getByLabel( `Import file` ).setInputFiles( file )
-    await expect( a.page.getByText( `Imported` ) ).toBeVisible( { timeout: 20_000 } )
-
-    // A brand-new device pulls all of it
-    const b = await device( browser, tenant )
-    await pair( a.page, b.page )
-    await b.page.goto( `/search?q=Bulk 2999` )
-    await expect( b.page.getByRole( `button`, { name: `Bulk 2999` } ) ).toBeVisible( { timeout: 30_000 } )
-    await b.page.goto( `/search?q=Bulk 0` )
-    await expect( b.page.getByRole( `button`, { name: `Bulk 0`, exact: true } ) ).toBeVisible()
 } )
 
 test( `a session revoked mid-reconnect stays out`, async ( { browser } ) => {

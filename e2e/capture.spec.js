@@ -78,7 +78,13 @@ test( `the same share added twice (history, second tab) is still one task`, asyn
     await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
     await expect( page.getByLabel( `Just added` ) ).toContainText( `Only once please` )
 
-    // Back through history, and in another tab
+    // Edit it, then back through history and in another tab: still one task, edits kept
+    await page.goto( `/inbox` )
+    await page.getByRole( `button`, { name: `Only once please` } ).click()
+    await page.getByRole( `dialog` ).getByLabel( `Notes` ).fill( `my research` )
+    await page.keyboard.press( `Escape` )
+    await expect( page.getByRole( `dialog` ) ).toHaveCount( 0 )
+    await page.waitForTimeout( 300 )
     await page.goto( url )
     await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
     const other = await context.newPage()
@@ -88,4 +94,6 @@ test( `the same share added twice (history, second tab) is still one task`, asyn
 
     await page.goto( `/inbox` )
     await expect( page.getByRole( `button`, { name: `Only once please` } ) ).toHaveCount( 1 )
+    await page.getByRole( `button`, { name: `Only once please` } ).click()
+    await expect( page.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `my research` )
 } )

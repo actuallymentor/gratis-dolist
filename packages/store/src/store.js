@@ -78,9 +78,13 @@ export const create_dolist_store = ( { name = `dolist`, persist = true, get_now 
         if( persister.getStatus() === IDLE ) settle()
     } )
 
-    // After a failed write, unchanged data never triggers autosave: a retry must force the repair save itself
+    // After a failed write, unchanged data never triggers autosave: a retry must force the repair save itself.
+    // If that repair fails too, this caller fails directly (never via another caller's settled errors)
     const flush = async () => {
-        if( needs_repair() ) await persister.save().catch( () => {} )
+        if( needs_repair() ) {
+            await persister.save().catch( () => {} )
+            if( needs_repair() ) throw new Error( `Saving to IndexedDB still fails` )
+        }
         return wait_idle()
     }
 

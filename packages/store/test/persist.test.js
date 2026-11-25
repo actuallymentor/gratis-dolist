@@ -141,6 +141,28 @@ describe( `IndexedDB failures`, () => {
         expect( heard ).toHaveLength( 1 )
     } )
 
+    it( `a forced full save never deletes rows another tab committed`, async () => {
+        const name = `db${ counter++ }`
+        const a = await boot( name )
+        add_task( a.store, { title: `From A` } )
+        await a.flush()
+
+        // Tab B writes straight to disk (its broadcast never reached A)
+        const other = createMergeableStore()
+        const { persister, close } = create_idb_persister( other, name )
+        await persister.load()
+        await persister.save()  // the first full save after a load is skipped by design
+        const b_id = add_task( other, { title: `From B` } )
+        await persister.save()
+        persister.destroy()
+        await close()
+
+        await a.persister.save()
+        await a.destroy()
+        const reopened = await boot( name )
+        expect( reopened.store.getCell( `tasks`, b_id, `title` ) ).toBe( `From B` )
+    } )
+
     it( `flush after a failure repairs even when nothing changed since`, async () => {
         const name = `db${ counter++ }`
         const { store, flush, destroy } = await boot( name )

@@ -6,12 +6,20 @@ export const ENROLLMENT_CODE = `e2e-enroll-code`
 export default defineConfig( {
     testDir: `e2e`,
     fullyParallel: true,
+
+    // Local: half of a big box's cores (16+) starves WebKit into timeouts; CI keeps the default
+    workers: process.env.CI ? undefined : 8,
     reporter: process.env.CI ? `github` : `list`,
     use: { baseURL: `http://localhost:8787`, trace: `retain-on-failure` },
     projects: [
-        { name: `desktop`, use: { ...devices[ `Desktop Chrome` ] } },
-        { name: `phone`, use: { ...devices[ `Pixel 7` ] } },
-        { name: `iphone`, use: { ...devices[ `iPhone 15` ] } },
+        { name: `desktop`, use: { ...devices[ `Desktop Chrome` ] }, testIgnore: /heavy\.spec/ },
+        { name: `phone`, use: { ...devices[ `Pixel 7` ] }, testIgnore: /heavy\.spec/ },
+        // One retry: under full local parallelism a WebKit request to wrangler dev occasionally never completes
+        // (~1 run in 5, never alone, never Chromium; see .notes/GOTCHAS.md). Real failures still fail twice
+        { name: `iphone`, use: { ...devices[ `iPhone 15` ] }, testIgnore: /heavy\.spec/, retries: 1 },
+
+        // Payload-size tests are browser-independent and saturate the dev server: alone, after the rest
+        { name: `heavy`, use: { ...devices[ `Desktop Chrome` ] }, testMatch: /heavy\.spec/, dependencies: [ `desktop`, `phone`, `iphone` ] },
     ],
     webServer: {
         // Fresh server state per run; E2E enables per-test tenants (dolist_tenant cookie), never set in prod
