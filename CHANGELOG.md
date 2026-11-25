@@ -5,7 +5,7 @@
 ### Added
 - `n` anywhere opens quick add in a centered modal (own draft)
 - keys: `j`/`k` select task, `Enter` opens it, `e` completes it
-- shorthand: `tom`, bare hours `at 18` / `at 09` / `at 5` (= 17:00)
+- shorthand: `tom`, bare hours `at 18` / `at 09` / `at 1500` / `at 5` (= 17:00)
 - edited titles parse shorthand (highlighted while typing, stripped on save)
 
 ### Changed

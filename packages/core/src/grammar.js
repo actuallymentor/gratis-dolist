@@ -3,7 +3,7 @@
 //   dates      today · tomorrow · tom · fri · next fri · next week · in 3 days · 12 nov · nov 12th · 2026-12-01
 //              (numeric 12/11 is deliberately NOT a date: day/month order is ambiguous and titles hold fractions)
 //   deadline   by fri (inclusive) · before fri (the day before)
-//   time       at 3pm · at 15:00 · 3:30pm · at noon · at 18 · at 09 · at 5 (bare 1–6 = afternoon)
+//   time       at 3pm · at 15:00 · 3:30pm · at noon · at 18 · at 09 · at 1500 · at 5 (bare 1–6 = afternoon)
 //   recurrence every day|weekday|mon|2 weeks|month on 31|year|1st sat|28 nov · every! 3 days (from completion)
 //   priority   !1–!4 or p1–p4, whole token only (`!!!` and `wow!1` stay text)
 //   project    #Errands · #"Two words" · #Work/Clients      label  @call · @"after work"
@@ -36,7 +36,7 @@ const date_src = dow => [
 
 const DATE_SRC = date_src( BARE_DOW_SRC )
 const PREFIXED_DATE_SRC = date_src( DOW_SRC )
-const TIME_SRC = String.raw`(?:noon|midnight|\d{1,2}(?::\d{2})?\s?(?:am|pm)|\d{1,2}:\d{2}|\d{1,2})`
+const TIME_SRC = String.raw`(?:noon|midnight|\d{1,2}(?::\d{2})?\s?(?:am|pm)|\d{1,2}:\d{2}|[01]\d[0-5]\d|2[0-3][0-5]\d|\d{1,2})`
 
 // `tom` means tomorrow, but capitalised `Tom` is a name ("Call Tom at 5")
 const names_tom = phrase => /\bTom\b/.test( phrase )
@@ -122,6 +122,10 @@ export const resolve_time_phrase = phrase => {
     if( text === `noon` ) return `12:00`
     if( text === `midnight` ) return `00:00`
 
+    // 24h `1500` / `0930` (only ever reached after `at`)
+    const compact = text.match( /^([01]\d|2[0-3])([0-5]\d)$/ )
+    if( compact ) return `${ compact[ 1 ] }:${ compact[ 2 ] }`
+
     const match = text.match( /^(\d{1,2})(?::(\d{2}))?\s?(am|pm)?$/ )
     if( !match ) return null
     const [ , hour_text, minute_text = `00`, meridiem ] = match
@@ -198,7 +202,7 @@ const RULES = [
     // Bare `at 5` is flagged: it only counts at the end or right before other grammar (see drop_loose_hours)
     { type: `time`, regex: new RegExp( `${ B }(?:at\\s+${ TIME_SRC }|\\d{1,2}(?::\\d{2})?\\s?(?:am|pm))${ E }`, `gi` ), read: match => {
         const time = resolve_time_phrase( match[ 0 ] )
-        return time && { value: time, .../^at\s+\d{1,2}$/i.test( match[ 0 ] ) && { bare: true } }
+        return time && { value: time, .../^at\s+(?:\d{1,2}|\d{4})$/i.test( match[ 0 ] ) && { bare: true } }
     } },
 
     { type: `date`, regex: new RegExp( `${ B }(?:on\\s+(?:${ PREFIXED_DATE_SRC })|${ DATE_SRC })${ E }`, `gi` ), read: ( match, { today, week_start } ) => {

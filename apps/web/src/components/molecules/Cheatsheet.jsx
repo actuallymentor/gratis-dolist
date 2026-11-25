@@ -4,7 +4,7 @@ import styled from 'styled-components'
 const ROWS = [
     [ `fri`, `Scheduled date: today, tom(orrow), mon…sun, 12 nov, in 3 days, next week` ],
     [ `by fri`, `Deadline (inclusive). before fri = the day before` ],
-    [ `at 3pm`, `Time: at 18, at 09:30, at 5 (= 17:00)` ],
+    [ `at 3pm`, `Time: at 18, at 09:30, at 1500, at 5 (= 17:00)` ],
     [ `every week`, `Repeats from the scheduled date. every! = from completion` ],
     [ `!1 … !4`, `Priority (p1 … p4 also work)` ],
     [ `#home`, `Project. #"Two words" for spaces` ],
