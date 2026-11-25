@@ -1,14 +1,36 @@
-// Cloudflare Worker: static assets only for now (the PWA in apps/web).
-// Deployed exclusively by .github/workflows/deploy.yml; add D1/KV bindings when sync lands.
+// Cloudflare Worker: the PWA (apps/web) + /api and /sync (apps/worker), plan §4.1.
+// Deployed exclusively by .github/workflows/deploy.yml.
 {
   "name": "dolist",
+  "main": "./apps/worker/src/index.js",
   "compatibility_date": "2026-11-01",
 
-  // Output of `npm run build`
+  // Output of `npm run build`; only /api and /sync wake the Worker
   "assets": {
     "directory": "./apps/web/dist",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [ "/api/*", "/sync" ]
   },
+
+  // Auth: the single owner's credentials. Sync: one TinyBase store per owner. Both SQLite-backed
+  "durable_objects": {
+    "bindings": [
+      { "name": "AUTH", "class_name": "Auth" },
+      { "name": "SYNC", "class_name": "Sync" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": [ "Auth", "Sync" ] }
+  ],
+
+  // Nightly snapshots (kept 30)
+  "r2_buckets": [
+    { "binding": "SNAPSHOTS", "bucket_name": "dolist-snapshots" }
+  ],
+  "triggers": { "crons": [ "17 3 * * *" ] },
+
+  // ENROLLMENT_CODE is a secret (wrangler secret put). The e2e tenant switch only ever comes from `wrangler dev --var`
 
   // First deploy creates the DNS record + cert for this custom domain
   "routes": [

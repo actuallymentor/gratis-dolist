@@ -61,7 +61,7 @@ test( `"Update app" offline keeps the working app`, async ( { page, context } ) 
 
     await context.setOffline( true )
     await page.getByRole( `button`, { name: `Update` } ).click()
-    await expect( page.getByRole( `status` ) ).toContainText( `offline` )
+    await expect( page.getByRole( `status` ).filter( { hasText: `Try again once` } ) ).toBeVisible()
 
     // Cached shell still loads
     await page.goto( `/today` )

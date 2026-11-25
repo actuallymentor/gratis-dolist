@@ -15,6 +15,7 @@ import OpenTask from './components/molecules/OpenTask'
 import { use_task_actions } from './hooks/use_task_actions'
 import { use_shortcuts } from './hooks/use_shortcuts'
 import { dolist } from './modules/dolist'
+import { begin_sync } from './modules/sync'
 
 const TOAST_STYLE = { background: `var(--fg)`, color: `var(--page)`, borderRadius: `999px`, fontSize: `.9rem` }
 
@@ -32,7 +33,11 @@ export default function App() {
     // `ready` rejects when local data can't be read: never run (and autosave) on an empty store then
     const [ status, set_status ] = useState( `loading` )
     useEffect( () => {
-        dolist.ready.then( () => set_status( `ready` ) ).catch( () => set_status( `failed` ) )
+        // Sync starts only on a store that loaded: merging into an unread store could push emptiness
+        dolist.ready.then( () => {
+            set_status( `ready` )
+            begin_sync()
+        } ).catch( () => set_status( `failed` ) )
 
         // Every failed save surfaces; the ack that was waiting on it fails too
         return dolist.on_save_error( () => toast.error( `Some changes couldn't be saved on this device. Keep this tab open and try again.`, { id: `save-error`, duration: 10_000 } ) )

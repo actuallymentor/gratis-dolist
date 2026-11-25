@@ -9,6 +9,7 @@ import { use_store } from '@dolist/store/react'
 import { download_json, fetch_todoist } from '../../modules/todoist'
 import { flush } from '../../modules/dolist'
 import Page from '../atoms/Page'
+import SyncSection from '../molecules/SyncSection'
 import { apply_theme, read_theme } from '../../modules/theme'
 import { hard_update } from '../../modules/pwa'
 import { build_hash } from '../../modules/build'
@@ -23,7 +24,10 @@ const Rows = styled.div`
 
     .row a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 .9rem; color: var(--accent-strong) }
     .row form { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end }
-    input[type="password"] { min-height: 44px; padding: 0 .9rem; border-radius: 999px; border: 1px solid var(--line); background: var(--page); width: 14rem; max-width: 100% }
+    input[type="password"], input.code { min-height: 44px; padding: 0 .9rem; border-radius: 999px; border: 1px solid var(--line); background: var(--page); width: 14rem; max-width: 100% }
+    input.code { font-family: var(--font-mono, ui-monospace, monospace); text-transform: uppercase }
+    code.codes { display: block; white-space: pre; margin-top: .6rem; font-size: .9rem; line-height: 1.6 }
+    code.pair { font-size: 1rem; color: var(--fg); user-select: all; overflow-wrap: anywhere }
     .file { position: relative; overflow: hidden }
     .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer }
     @media ( max-width: 560px ) { .row { flex-wrap: wrap } }
@@ -32,7 +36,7 @@ const Rows = styled.div`
         min-height: 44px; padding: 0 .9rem; border-radius: 999px; cursor: pointer;
         border: 1px solid var(--line); background: var(--page);
     }
-    button, .file { display: inline-flex; align-items: center; gap: .4rem; font-size: .94rem }
+    button, .file { display: inline-flex; align-items: center; gap: .4rem; font-size: .94rem; white-space: nowrap; flex-shrink: 0 }
 `
 
 const Section = styled.h2`
@@ -121,6 +125,10 @@ export default function SettingsPage() {
                     <RefreshCw size={ 16 } strokeWidth={ 1.5 } aria-hidden /> Update
                 </button>
             </div>
+        </Rows>
+        <Section>Sync</Section>
+        <Rows>
+            <SyncSection />
         </Rows>
         <Section>Your data</Section>
         <Rows>

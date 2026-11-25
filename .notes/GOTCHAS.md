@@ -19,3 +19,8 @@
 - **Edit buffers must follow the store.** A local `useState(task.x)` committed on close overwrites other tabs' newer edits. Use a buffer with a base (TaskDetail `use_field`): adopt stored changes unless the user holds an edit; settle after save.
 - **sessionStorage is copied** into duplicated / `window.open` tabs → "per-tab" ids collide. Verify uniqueness with a Web Lock `ifAvailable` (retry once for reload races); buffer draft writes in memory until the id is final.
 - **A failed IDB write loses its delta.** Incremental persister sets `repair_pending`; the next save merges full content. Don't just clear the error.
+- **wrangler dev rewrites request URL + Origin to the route host** (`http://dolist.gratis.sh`). Never gate on hostname; e2e tenant switch is gated by the `E2E` var only (unit test forbids it in configs).
+- **wrangler dev loads `.env.local` into the Worker** (incl. TODOIST token). Playwright sets `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false`.
+- **Offline WebSockets:** Chromium emulated offline stalls (no close), WebKit keeps it alive; `close()` while offline hangs on the handshake. Client detaches the socket on `offline` before closing.
+- **TinyBase WsServerDurableObject:** overriding `authorize` switches to hub mode; access object is the socket attachment (survives hibernation). Revocation needs a stored fence, not only closing sockets.
+- **Playwright browsers can vanish from ~/.cache** → `npx playwright install chromium webkit`.
