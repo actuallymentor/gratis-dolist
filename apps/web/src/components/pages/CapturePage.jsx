@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import styled from 'styled-components'
 import { Check, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { add_task } from '@dolist/store'
+import { add_task, restore_task, update_task } from '@dolist/store'
 import { use_store } from '@dolist/store/react'
 import Page from '../atoms/Page'
 import QuickAdd from '../molecules/QuickAdd'
@@ -96,15 +96,23 @@ export default function CapturePage() {
         if( !title || saving ) return
         set_saving( true )
         const id = await share_id( share.source ?? `${ share.title }\n${ share.notes }` )
+        const fields = { title, notes: share.notes || null }
 
-        // Already added (and maybe edited since): leave it exactly as it is
-        const exists = store.hasRow( `tasks`, id )
-        if( !exists ) add_task( store, { id, title, notes: share.notes || undefined } )
+        // This card's own earlier attempt (save failed): write the current edits into it.
+        // Added before and kept (maybe edited since): leave it. Deleted since: bring it back
+        const ours = share.attempt_id === id
+        const exists = !ours && store.hasRow( `tasks`, id )
+        const deleted = exists && !!store.getCell( `tasks`, id, `deleted_at` )
+        if( ours ) update_task( store, id, fields )
+        else if( deleted ) restore_task( store, id )
+        else if( !exists ) add_task( store, { id, ...fields, notes: fields.notes || undefined } )
+        set_share( { ...share, attempt_id: id } )
         try {
             await flush()
             remember( title )
             clear_share()
-            if( exists ) toast( `Already in your tasks` )
+            if( deleted ) toast( `Brought back from deleted` )
+            else if( exists ) toast( `Already in your tasks` )
         } catch {
             toast( `Couldn't save it on this device. Try again once storage frees up.` )
         } finally {

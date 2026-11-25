@@ -181,6 +181,18 @@ describe( `IndexedDB failures`, () => {
         expect( reopened.store.getCell( `tasks`, id, `title` ) ).toBe( `Retry me` )
     } )
 
+    it( `a failed repair doesn't poison the next healthy flush`, async () => {
+        const { store, flush } = await boot( `db${ counter++ }` )
+        const broken = vi.spyOn( IDBDatabase.prototype, `transaction` ).mockImplementation( () => {
+            throw new DOMException( `full`, `QuotaExceededError` )
+        } )
+        add_task( store, { title: `Stuck` } )
+        await expect( flush() ).rejects.toThrow()
+        await expect( flush() ).rejects.toThrow( /still fails/ )
+        broken.mockRestore()
+        await expect( flush() ).resolves.toBeUndefined()
+    } )
+
     it( `the save after a failure repairs what the failed write dropped`, async () => {
         const name = `db${ counter++ }`
         const { store, flush, destroy } = await boot( name )

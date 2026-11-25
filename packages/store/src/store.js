@@ -83,7 +83,14 @@ export const create_dolist_store = ( { name = `dolist`, persist = true, get_now 
     const flush = async () => {
         if( needs_repair() ) {
             await persister.save().catch( () => {} )
-            if( needs_repair() ) throw new Error( `Saving to IndexedDB still fails` )
+            if( needs_repair() ) {
+
+                // Report it once, to everyone waiting: a later healthy save must not inherit this error
+                const failure = new Error( `Saving to IndexedDB still fails`, { cause: unreported_errors.at( -1 ) } )
+                unreported_errors.splice( 0 )
+                waiting.splice( 0 ).forEach( ( { reject } ) => reject( failure ) )
+                throw failure
+            }
         }
         return wait_idle()
     }

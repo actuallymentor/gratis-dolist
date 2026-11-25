@@ -97,3 +97,22 @@ test( `the same share added twice (history, second tab) is still one task`, asyn
     await page.getByRole( `button`, { name: `Only once please` } ).click()
     await expect( page.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `my research` )
 } )
+
+test( `a deleted share comes back when shared again`, async ( { page } ) => {
+    const url = `/capture?title=${ encodeURIComponent( `Bring me back` ) }`
+    await page.goto( url )
+    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await expect( page.getByLabel( `Just added` ) ).toContainText( `Bring me back` )
+
+    await page.goto( `/inbox` )
+    await page.getByRole( `button`, { name: `Bring me back` } ).click()
+    await page.getByRole( `button`, { name: `Delete task` } ).click()
+    await expect( page.getByRole( `button`, { name: `Bring me back` } ) ).toHaveCount( 0 )
+    await page.waitForTimeout( 300 )
+
+    await page.goto( url )
+    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await expect( page.getByText( `Brought back from deleted` ) ).toBeVisible()
+    await page.goto( `/inbox` )
+    await expect( page.getByRole( `button`, { name: `Bring me back` } ) ).toHaveCount( 1 )
+} )
