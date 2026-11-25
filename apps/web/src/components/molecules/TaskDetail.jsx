@@ -41,21 +41,41 @@ const Panel = styled( Modal )`
     .danger { color: var(--bad); padding: 0 1rem; justify-self: start; gap: .4rem; display: inline-flex; align-items: center }
 `
 
+// Stored protected ranges (quoted text at capture, e.g. `Read "by fri" book`) follow their text into the edited title
+const carry_masks = ( { title, literal_mask }, text ) => {
+    let ranges = literal_mask || []
+    try {
+        if( typeof ranges === `string` ) ranges = JSON.parse( ranges )
+    } catch {
+        ranges = []
+    }
+    let from = 0
+    return ranges.flatMap( ( [ start, end ] ) => {
+        const piece = title.slice( start, end )
+        const at = piece ? text.indexOf( piece, from ) : -1
+        if( at < 0 ) return []
+        from = at + piece.length
+        return [ [ at, at + piece.length ] ]
+    } )
+}
+
 /**
- * Reads shorthand typed into an edited title. Unknown #project / @label stay in the title as written
- * (the detail never creates names silently), so they're re-parsed as literal ranges.
+ * Reads shorthand typed into an edited title. Protected text stays text; unknown #project / @label stay in
+ * the title as written (the detail never creates names silently), so they're re-parsed as protected too.
+ * @returns parse_quick_add result for saving + `highlights` (incl. unknown names, shown dotted)
  */
-const parse_title = ( text, ctx ) => {
-    const first = parse_quick_add( text, ctx )
+const parse_title = ( text, ctx, kept ) => {
+    const first = parse_quick_add( text, { ...ctx, literal_ranges: kept } )
     const unknown = first.spans.filter( ( { unknown } ) => unknown ).map( ( { start, end } ) => [ start, end ] )
-    const { task } = unknown.length ? parse_quick_add( text, { ...ctx, literal_ranges: unknown } ) : first
-    return { task, spans: first.spans.filter( ( { type } ) => type !== `literal` ) }
+    const final = unknown.length ? parse_quick_add( text, { ...ctx, literal_ranges: [ ...kept, ...unknown ] } ) : first
+    return { ...final, highlights: first.spans.filter( ( { type } ) => type !== `literal` ) }
 }
 
 // Only what the title's shorthand actually said; a bare time keeps an existing date
 const shorthand_patch = ( task, { task: parsed, spans }, project_id_of ) => {
     const has = type => spans.some( span => span.type === type && !span.unknown )
     return {
+        literal_mask: parsed.literal_mask ?? null,
         ...( has( `date` ) || has( `recur` ) || has( `time` ) && !task.scheduled ) && { scheduled: parsed.scheduled },
         ...has( `time` ) && { time: parsed.time },
         ...has( `deadline` ) && { deadline: parsed.deadline },
@@ -127,13 +147,21 @@ export default function TaskDetail( { task, on_close } ) {
         projects: projects.map( ( { name } ) => name ),
         labels: labels.map( ( { name } ) => name ),
     } )
-    const title_parse = useMemo( () => title_dirty ? parse_title( title, parse_ctx() ) : { spans: [] }, [ title, title_dirty, today, projects, labels ] ) // parse_ctx is recreated per render
+    const read_title = text => {
+        const kept = carry_masks( task, text )
+        const parsed = parse_title( text, parse_ctx(), kept )
+
+        // A repeat added without a date continues from the task's own date (like the Repeats field), not from today
+        const anchored = parsed.spans.some( ( { type } ) => type === `recur` ) && !parsed.spans.some( ( { type } ) => type === `date` ) && task.scheduled
+        return anchored ? { ...parse_title( text, { ...parse_ctx(), today: task.scheduled, now: undefined }, kept ), highlights: parsed.highlights } : parsed
+    }
+    const title_highlights = useMemo( () => title_dirty ? read_title( title ).highlights : [], [ title, title_dirty, today, projects, labels, task ] ) // read_title is recreated per render
     const project_id_of = name => get_projects( store ).find( project => project.name.toLowerCase() === name?.toLowerCase() )?.id ?? null
 
     // Each committer writes only what the user edited here
     const save_title = () => {
         if( !title_dirty || !title.trim() ) return
-        const parsed = parse_title( title, parse_ctx() )
+        const parsed = read_title( title )
         const clean = parsed.task.title.trim() || task.title
         save( { title: clean, ...shorthand_patch( task, parsed, project_id_of ) } )
         settle_title( clean )
@@ -184,9 +212,8 @@ export default function TaskDetail( { task, on_close } ) {
     const dirty = title_dirty || notes_dirty || labels_dirty || recur_dirty
     useEffect( () => mark_unsaved( id, dirty ), [ id, dirty, mark_unsaved ] )
 
-    // Focus management: focus the panel on open; Escape commits, then closes; unmount commits too
+    // Focus the panel on open (Modal restores the opener); Escape commits, then closes; unmount commits too
     useEffect( () => {
-        const previous = document.activeElement
         panel_ref.current?.focus()
         const on_key = event => event.key === `Escape` && on_close()
         window.addEventListener( `keydown`, on_key )
@@ -194,7 +221,6 @@ export default function TaskDetail( { task, on_close } ) {
             window.removeEventListener( `keydown`, on_key )
             commit_ref.current?.()
             mark_unsaved( id, false )
-            previous?.focus?.()
         }
     }, [ on_close, id, mark_unsaved ] )
 
@@ -220,7 +246,7 @@ export default function TaskDetail( { task, on_close } ) {
 
     return <Panel ref={ panel_ref } label={ `Task: ${ task.title }` } on_close={ on_close } width="38rem">
         <header>
-            <ShorthandField className="title" value={ title } spans={ title_parse.spans } aria-label="Title"
+            <ShorthandField className="title" value={ title } spans={ title_highlights } aria-label="Title"
                 onChange={ ( { target: { value } } ) => set_title( value ) }
                 onBlur={ save_title }
                 onKeyDown={ event => event.key === `Enter` && event.currentTarget.blur() }

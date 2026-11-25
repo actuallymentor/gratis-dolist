@@ -39,3 +39,5 @@
 - WebKit ↔ wrangler dev stall reproduces with bursts of sequential POSTs (6 code attempts): a request just never completes, even serially. Not seen on Chromium. Server-only rules → test on Chromium only.
 - `useEffect( () => cond && promise )` / `return promise` inside an effect = React treats it as cleanup → blank page. Never return a promise from an effect.
 - Global keys (`use_shortcuts`) bail while any `[role="dialog"]` exists; new overlays must carry that role or j/k/e act behind them. e2e: wait for the page heading before pressing keys (store loads async, Overlays mount after).
+- Modal opener focus must be captured at render (`useState` init): child `autoFocus` runs before effects, so an effect sees the dialog's own input.
+- Edited titles carry stored `literal_mask` by substring match (TaskDetail `carry_masks`); without it, quoted text from capture parses on the next edit.

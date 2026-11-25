@@ -50,6 +50,7 @@ test.describe( `keyboard`, () => {
         await modal( page ).getByRole( `textbox`, { name: `New task` } ).fill( `Call mum tom at 5` )
         await expect( modal( page ).locator( `mark` ) ).toHaveText( [ `tom`, `at 5` ] )
         await page.keyboard.press( `Enter` )
+        await expect( page.getByText( `Added “Call mum”` ) ).toBeVisible()
 
         await page.goto( `/horizons` )
         const call = card( page, `Call mum` )
@@ -77,7 +78,7 @@ test.describe( `keyboard`, () => {
         const detail = page.getByRole( `dialog`, { name: /Task: Second/ } )
         await expect( detail ).toBeVisible()
         const box = await detail.boundingBox()
-        const width = page.viewportSize().width
+        const { width } = page.viewportSize()
         expect( Math.abs( box.x + box.width / 2 - width / 2 ) ).toBeLessThan( 4 )
 
         // Keys don't act behind the dialog
@@ -91,6 +92,14 @@ test.describe( `keyboard`, () => {
         await page.keyboard.press( `e` )
         await expect( page.getByText( `Completed “Second”` ) ).toBeVisible()
         await expect( titles ).toHaveText( [ `First`, `Third` ] )
+        await expect( page.getByRole( `button`, { name: `Third`, exact: true } ) ).toBeFocused()
+
+        // Quick add returns focus to the selection; Tab stays inside the modal
+        await page.keyboard.press( `n` )
+        await page.keyboard.press( `Tab` )
+        await page.keyboard.press( `Tab` )
+        await expect( modal( page ).locator( `:focus` ) ).toHaveCount( 1 )
+        await page.keyboard.press( `Escape` )
         await expect( page.getByRole( `button`, { name: `Third`, exact: true } ) ).toBeFocused()
     } )
 } )
@@ -115,8 +124,25 @@ test( `editing a title parses its shorthand and strips it`, async ( { page } ) =
     const scheduled = await detail.getByLabel( `Scheduled` ).inputValue()
     expect( new Date( `${ scheduled }T12:00` ).getDay() ).toBe( 1 )
 
-    // Unknown names are never created silently: they stay in the title
-    await title.fill( `Gym #Nowhere` )
+    // Unknown names are never created silently: they stay in the title, and don't cost the time next to them
+    await title.fill( `Gym at 5 #Nowhere` )
     await title.press( `Enter` )
     await expect( title ).toHaveValue( `Gym #Nowhere` )
+    await expect( detail.getByLabel( `Time` ) ).toHaveValue( `17:00` )
+} )
+
+test( `quoted text stays protected through later title edits`, async ( { page } ) => {
+
+    await page.goto( `/inbox` )
+    await quick_add( page ).fill( `Read "by friday" book` )
+    await quick_add( page ).press( `Enter` )
+    await page.getByRole( `button`, { name: `Read by friday book`, exact: true } ).click()
+
+    const detail = page.getByRole( `dialog`, { name: /Task: Read by friday book/ } )
+    const title = detail.getByLabel( `Title` )
+    await title.fill( `Read by friday book again` )
+    await expect( detail.locator( `mark` ) ).toHaveCount( 0 )
+    await title.press( `Enter` )
+    await expect( title ).toHaveValue( `Read by friday book again` )
+    await expect( detail.getByLabel( `Deadline` ) ).toHaveValue( `` )
 } )

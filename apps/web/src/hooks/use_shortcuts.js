@@ -30,7 +30,7 @@ const complete = () => {
 }
 
 /**
- * Global single-key shortcuts; ignored while typing in a field or while a dialog is open.
+ * Global single-key shortcuts; ignored while typing in a field or while a dialog / menu is open.
  *   n new task (modal) · / search · j/k next/previous task · e complete · Enter open (native on the focused title)
  */
 export const use_shortcuts = () => {
@@ -42,7 +42,7 @@ export const use_shortcuts = () => {
         const on_key = event => {
             if( event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented ) return
             if( /input|textarea|select/i.test( event.target.tagName ) || event.target.isContentEditable ) return
-            if( document.querySelector( `[role="dialog"]` ) ) return
+            if( document.querySelector( `[role="dialog"], [role="menu"]` ) ) return
 
             const actions = {
                 '/': () => navigate( `/search` ),

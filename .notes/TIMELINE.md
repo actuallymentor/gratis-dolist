@@ -18,3 +18,4 @@
 - 2026-11-25: User asked for login + registration (passkey + email link). Replaced single-owner codes (enrollment/pairing/recovery) with multi-user accounts; `/signin` page; email via Cloudflare Email Service binding; ENROLLMENT_CODE no longer used.
 - 2026-11-25 — User: always push to main (PR only on request). Accounts deployed; perf smoke add budget 1.5s→4s for CI; 503 email replies carry CF error code.
 - 2026-11-25 — UX pass (user request): global `n` → quick-add modal (own draft slot `quick-add-modal`); grammar `tom`, bare `at 5/18/09`; edited titles parse + strip shorthand (unknown #/@ stay in title); task detail = centered modal (phones: bottom sheet); j/k/e/Enter keys (selection = focus on card title).
+- 2026-11-25 — phoneafriend (5/5 codex personas agreed): fixed literal_mask loss on edit, unknown-name time wipe, decimals as hours, keys behind Move menu, modal focus trap/restore, recurrence re-anchoring.

@@ -11,3 +11,8 @@
 ### Changed
 - task detail is a centered modal (bottom sheet on phones)
 - quick-add time chip shows the resolved time
+- modals trap Tab and return focus (keeps the j/k selection)
+
+### Fixed
+- title edits keep quoted text protected; `at 5.50` stays an amount
+- unknown #name next to a time no longer clears the time; added repeats keep the task's date

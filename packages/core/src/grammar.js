@@ -237,13 +237,14 @@ const mask_text = ( text, extra_ranges ) => {
     return text.split( `` ).map( ( char, index ) => ranges.some( ( [ start, end ] ) => index >= start && index < end ) ? MASK : char ).join( `` )
 }
 
-// "Meet at 5 shops" is a count, "Call tom at 5" / "at 5 tom" a time: a bare hour must end the text or touch another token
-const drop_loose_hours = ( text, spans ) => spans.filter( ( span, index ) => {
+// "Meet at 5 shops" / "at 5.50" are amounts, "Call tom at 5" / "at 5 tom" times: a bare hour must end the text
+// (or clause) or touch another token; protected ranges count as tokens ("at 5 #NewProject" kept as written)
+const drop_loose_hours = ( text, spans, literal_ranges ) => spans.filter( span => {
     if( !span.bare ) return true
     const rest = text.slice( span.end )
-    const gap = rest.length - rest.trimStart().length
-    const next = spans[ index + 1 ]
-    return !rest.trim() || /^[,.;!?)]/.test( rest ) || next?.start === span.end + gap
+    const next_at = span.end + rest.length - rest.trimStart().length
+    const touches = [ ...spans.map( ( { start } ) => start ), ...literal_ranges.map( ( [ start ] ) => start ) ].includes( next_at )
+    return !rest.trim() || /^[,.;!?)](?!\d)/.test( rest ) || touches
 } ).map( ( { bare, ...span } ) => span )
 
 // Run every rule over the masked text; first claim wins, overlaps are skipped
@@ -260,7 +261,7 @@ const scan = ( text, ctx, literal_ranges ) => {
         if( result ) spans.push( { type, start, end, raw: text.slice( start, end ), ...result } )
     } ) )
 
-    return drop_loose_hours( text, spans.sort( ( a, b ) => a.start - b.start ) )
+    return drop_loose_hours( text, spans.sort( ( a, b ) => a.start - b.start ), literal_ranges )
 }
 
 /* ---------------------------------------------------------------------------

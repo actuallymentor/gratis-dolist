@@ -75,6 +75,10 @@ describe( `dates (§2.4 contract table)`, () => {
         expect( task_of( `x at 7` ).time ).toBe( `07:00` )
         expect( task_of( `x at 24` ) ).toMatchObject( { time: null, title: `x at 24` } )
         expect( task_of( `buy 5 apples` ).title ).toBe( `buy 5 apples` )
+        expect( task_of( `Buy shares at 5.50` ) ).toMatchObject( { time: null, title: `Buy shares at 5.50` } )
+        expect( task_of( `Meet at 5,000 feet` ).time ).toBe( null )
+        expect( task_of( `Call at 5, then eat` ).time ).toBe( `17:00` )
+        expect( task_of( `Gym at 5 #Nowhere`, { literal_ranges: [ [ 9, 17 ] ] } ) ).toMatchObject( { time: `17:00`, title: `Gym #Nowhere` } )
     } )
 
     it( `reads everyday shorthand combos`, () => {
