@@ -49,6 +49,13 @@ export const start_sync = ( store, { url, on_status = () => {}, should_retry = a
         delay = Math.min( delay * 2, MAX_DELAY )
     }
 
+    // A dead socket's close handshake can hang for minutes: detach (reconnect logic runs now), then close
+    const detach = current => {
+        if( socket !== current ) return
+        ended( current, 1006 )
+        current.close()
+    }
+
     // Hoisted: `ended` and `connect` call each other
     async function connect() {
 
@@ -77,7 +84,7 @@ export const start_sync = ( store, { url, on_status = () => {}, should_retry = a
         const on_error = error => {
             failed = true
             console.warn( `dolist sync:`, error?.message ?? error )
-            if( socket === current ) current.close()
+            detach( current )
         }
         synchronizer = await createWsSynchronizer( store, current, REQUEST_TIMEOUT, undefined, undefined, on_error, FRAGMENT_SIZE )
         await synchronizer.startSync()
@@ -90,13 +97,8 @@ export const start_sync = ( store, { url, on_status = () => {}, should_retry = a
 
     return {
 
-        // Network gone: a half-open socket's close handshake can hang for minutes, so detach first, then close
-        drop: () => {
-            const current = socket
-            if( !current ) return
-            ended( current, 1006 )
-            current.close()
-        },
+        // Network gone: drop the socket now
+        drop: () => socket && detach( socket ),
 
         // Network came back: skip the remaining backoff
         retry_now: () => {

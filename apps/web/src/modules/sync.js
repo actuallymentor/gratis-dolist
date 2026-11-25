@@ -22,7 +22,11 @@ export const api = async ( path, { method = `GET`, body } = {} ) => {
         headers: body ? { 'Content-Type': `application/json` } : undefined,
         body: body ? JSON.stringify( body ) : undefined,
     } )
-    const json = await response.json().catch( () => ( {} ) )
+    // A body that fails to arrive on a 2xx is a failure too (enrollment's recovery codes live there)
+    const json = await response.json().catch( error => {
+        if( response.ok ) throw error
+        return {}
+    } )
     if( !response.ok ) throw Object.assign( new Error( json.error || `Request failed (${ response.status })` ), { status: response.status } )
     return json
 }
@@ -94,7 +98,9 @@ const account_channel = typeof BroadcastChannel === `undefined` ? null : new Bro
 export const announce_account_change = () => account_channel?.postMessage( `changed` )
 account_channel?.addEventListener( `message`, async () => {
     const account = await refresh_account()
-    if( account?.signed_in ) return begin_sync()
+
+    // Unknown (request failed) keeps whatever runs; only a definite sign-out stops sync
+    if( !account || account.signed_in ) return begin_sync()
     end_sync()
     set_sync_status( `off` )
 } )

@@ -27,6 +27,19 @@ export class Auth extends DurableObject {
         super( ctx, env )
         this.sql = ctx.storage.sql
         this.sql.exec( SCHEMA )
+
+        // Additive migrations (CREATE TABLE IF NOT EXISTS never adds columns to an existing table).
+        // Owners from before `confirmed` existed count as confirmed: they're in use
+        if( this.add_column( `owner`, `confirmed INTEGER` ) ) this.sql.exec( `UPDATE owner SET confirmed = created` )
+        this.add_column( `failures`, `source TEXT` )
+    }
+
+    // Adds a column if missing; returns whether it did
+    add_column( table, definition ) {
+        const [ column ] = definition.split( ` ` )
+        if( this.rows( `PRAGMA table_info( ${ table } )` ).some( ( { name } ) => name === column ) ) return false
+        this.sql.exec( `ALTER TABLE ${ table } ADD COLUMN ${ definition }` )
+        return true
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -83,12 +96,13 @@ export class Auth extends DurableObject {
         const now = Date.now()
         if( this.throttled( now, source ) ) return { error: `throttled` }
 
-        const typed = normalize_code( code )
-        const hash = await sha256( typed )
+        // Hash everything up front: no await may sit between an eligibility check and the writes it guards
+        const hash = await sha256( normalize_code( code ) )
+        const enrollment_hash = this.env.ENROLLMENT_CODE ? await sha256( normalize_code( this.env.ENROLLMENT_CODE ) ) : null
 
         // Enrollment: closes for good once the owner's first session is used (see confirmed). A retry before
         // that discards the unconfirmed attempt, which never synced anything
-        if( this.enrollable() && hash === await sha256( normalize_code( this.env.ENROLLMENT_CODE ) ) ) {
+        if( this.enrollable() && hash === enrollment_hash ) {
             for( const table of [ `owner`, `sessions`, `recovery`, `pairing` ] ) this.sql.exec( `DELETE FROM ${ table }` )
             this.sql.exec( `INSERT INTO owner ( id, created ) VALUES ( ?, ? )`, crypto.randomUUID(), now )
             const recovery_codes = Array.from( { length: RECOVERY_CODES }, () => random_code( 80 ) )

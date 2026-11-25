@@ -87,6 +87,23 @@ describe( `start_sync`, () => {
         sync.stop()
     } )
 
+    it( `a failed exchange on a socket whose close hangs still recovers`, async () => {
+        control.fail_next = true
+        const { sync, sockets, statuses } = harness( async () => true )
+
+        // Half-open: close() never completes
+        sockets[ 0 ].close = () => {}
+        sockets[ 0 ].open()
+        await tick()
+        expect( statuses.at( -1 ) ).toBe( `offline` )
+
+        sync.retry_now()
+        sockets[ 1 ].open()
+        await tick()
+        expect( statuses.at( -1 ) ).toBe( `synced` )
+        sync.stop()
+    } )
+
     it( `revoked stops for good without asking`, async () => {
         const should_retry = vi.fn( async () => true )
         const { sockets, statuses } = harness( should_retry )
