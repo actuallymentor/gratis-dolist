@@ -22,3 +22,4 @@
 - Accounts deployed (passkey sign-up/sign-in verified in prod). Email links fail: send() → `E_SENDER_DOMAIN_NOT_CONFIGURED`.
 - gratis.sh has no `cf-bounce` MX/SPF or `_dmarc` records ⇒ not onboarded for Email *Sending* (Routing ≠ Sending). Fix: dash → Compute → Email Service → Email Sending → Onboard Domain → gratis.sh, same account as the Worker.
 - Prod smoke left 3 throwaway passkey-only accounts (no email, no tasks).
+- 2026-11-25 later: RESOLVED — gratis.sh onboarded for Email Sending (cf-bounce MX/SPF + DMARC live); prod /api/email-link → 200. Inbox delivery not verified by agent (no inbox access).
