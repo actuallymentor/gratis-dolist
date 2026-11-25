@@ -28,3 +28,5 @@
 - **TinyBase skew guard drops edits silently** and HLCs are monotonic, so one fast-clock stamp poisons all later edits. Dolist runs with `Infinity`.
 - **`pgrep -f "x"` in a `while` loop matches its own shell** → loop never ends. Wait on explicit PIDs.
 - **codex reviews get cut off by OpenAI's cyber filter** when prompts say "security holes"; frame as correctness/reliability.
+- **iOS won't raise the keyboard on autofocus** without a user gesture; /capture focuses the input (caret ready) but the tap-to-type remains on iOS. Real-device check pending.
+- **Floating pills cover mobile content** (bottom-left sits on lists/details). Keep persistent hints inline (Settings), pills only for transient actions.

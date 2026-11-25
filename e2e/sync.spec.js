@@ -208,3 +208,26 @@ test( `new recovery codes void the old ones`, async ( { browser } ) => {
     await sign_in( b.page, new_code )
     await expect( status( b.page ) ).toHaveText( `Synced` )
 } )
+
+test( `airplane-mode capture syncs later, exactly once`, async ( { browser } ) => {
+    const tenant = owner()
+    const phone = await device( browser, tenant )
+    const laptop = await device( browser, tenant )
+    await enroll( phone.page )
+    await pair( phone.page, laptop.page )
+
+    await phone.page.goto( `/capture` )
+    await phone.context.setOffline( true )
+    await quick_add( phone.page ).fill( `Captured in the air` )
+    await quick_add( phone.page ).press( `Enter` )
+    await expect( phone.page.getByLabel( `Just added` ) ).toContainText( `Captured in the air` )
+
+    // Reload while offline too (app shell from the service worker), then land
+    await phone.page.reload()
+    await phone.context.setOffline( false )
+
+    await laptop.page.goto( `/inbox` )
+    await expect( laptop.page.getByRole( `button`, { name: `Captured in the air` } ) ).toHaveCount( 1, { timeout: 20_000 } )
+    await laptop.page.waitForTimeout( 1_500 )
+    await expect( laptop.page.getByRole( `button`, { name: `Captured in the air` } ) ).toHaveCount( 1 )
+} )

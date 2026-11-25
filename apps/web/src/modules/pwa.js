@@ -95,3 +95,6 @@ export const listen_for_install = () => {
 }
 
 export const is_standalone = () => window.matchMedia?.( `(display-mode: standalone)` ).matches || window.navigator.standalone === true
+
+// iOS never offers an install prompt: Add to Home Screen lives in Safari's share sheet
+export const is_ios = () => /iPhone|iPad|iPod/.test( navigator.userAgent ) || navigator.platform === `MacIntel` && navigator.maxTouchPoints > 1

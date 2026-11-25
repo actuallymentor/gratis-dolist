@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import styled from 'styled-components'
-import { Download, RefreshCw, Upload } from 'lucide-react'
+import { Download, RefreshCw, Share, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { from_todoist } from '@dolist/core'
 import { export_json, import_json, import_todoist } from '@dolist/store'
@@ -11,7 +11,7 @@ import { flush } from '../../modules/dolist'
 import Page from '../atoms/Page'
 import SyncSection from '../molecules/SyncSection'
 import { apply_theme, read_theme } from '../../modules/theme'
-import { hard_update } from '../../modules/pwa'
+import { hard_update, is_ios, is_standalone } from '../../modules/pwa'
 import { build_hash } from '../../modules/build'
 
 const Rows = styled.div`
@@ -116,6 +116,12 @@ export default function SettingsPage() {
                     <option value="dark">Dark</option>
                 </select>
             </label>
+            { is_ios() && !is_standalone() && <div className="row" aria-label="Install on iPhone">
+                <span>
+                    Install app
+                    <small>Tap <Share size={ 14 } strokeWidth={ 1.5 } aria-label="Share" /> in Safari, then <strong>Add to Home Screen</strong>. Dolist then opens straight to a new task.</small>
+                </span>
+            </div> }
             <div className="row">
                 <span>
                     Update app

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { CalendarDays, Clock, Flag, Hash, Plus, Repeat, Tag, TriangleAlert } from 'lucide-react'
 import { parse_quick_add, resolve_date_label } from '@dolist/core'
@@ -27,10 +27,20 @@ const Box = styled.form`
     .field { position: relative; flex: 1; min-width: 0 }
     .field input, .field .hl { font: 500 1rem/1.5 var(--font-body); padding: .25rem 0; width: 100%; border: 0; white-space: pre; letter-spacing: normal }
     .field input { position: relative; z-index: 1; background: transparent; color: transparent; caret-color: var(--fg); outline: none }
+
+    /* The box's focus-within ring is the focus signal; no second ring on the bare input */
+    .field input:focus-visible { box-shadow: none }
     .field input::placeholder { color: var(--faint) }
     .field .hl { position: absolute; inset: 0; pointer-events: none; color: var(--fg); overflow: hidden }
     .hl mark { background: none; color: var(--accent-strong) }
     .hl mark[data-unknown] { color: var(--muted); text-decoration: underline dotted }
+
+    .accessory { display: flex; gap: .4rem; padding: .45rem 0 .1rem 1.6rem; overflow-x: auto }
+    .accessory button, .accessory label {
+        all: unset; cursor: pointer; position: relative; display: inline-grid; place-items: center; min-width: 44px; min-height: 40px; padding: 0 .7rem;
+        border-radius: 999px; background: var(--sunk); color: var(--fg); font: 500 .95rem var(--font-body); box-sizing: border-box;
+    }
+    .accessory label input { position: absolute; inset: 0; opacity: 0; cursor: pointer }
 
     .chips { display: flex; gap: .3rem; flex-wrap: wrap; align-items: center; padding: .35rem 0 .1rem 1.6rem }
     .chips button { all: unset; cursor: pointer; display: inline-flex }
@@ -70,7 +80,15 @@ const segments_of = ( text, spans ) => {
  * The draft survives reloads and blocks silent app updates while unsent.
  * Unknown #project / @label are never created silently: Enter once shows the offer, Enter again creates.
  */
-export default function QuickAdd( { defaults = {}, placeholder = `Add a task… try "Call mum fri by sun !2 #home"`, autofocus } ) {
+/**
+ * @param {Object} props
+ * @param {Object} [props.defaults] - project_id / scheduled for tasks added here
+ * @param {boolean} [props.autofocus]
+ * @param {string} [props.prefill] - text to put in the line (e.g. shared from another app); appended to a draft
+ * @param {boolean} [props.accessory] - show the touch accessory row ( # @ ! by 📅 )
+ * @param {Function} [props.on_added] - called with the saved task's title once it's on disk
+ */
+export default function QuickAdd( { defaults = {}, placeholder = `Add a task… try "Call mum fri by sun !2 #home"`, autofocus, prefill, accessory, on_added } ) {
 
     const store = use_store()
     const projects = use_projects()
@@ -81,7 +99,11 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const id = useId()
     const input_ref = useRef( null )
     const hl_ref = useRef( null )
-    const [ text, set_text ] = useState( read_draft )
+    const [ text, set_text ] = useState( () => {
+        const draft = read_draft()
+        if( !prefill ) return draft
+        return draft ? `${ draft } ${ prefill }` : prefill
+    } )
     const [ confirm_create, set_confirm_create ] = useState( false )
     const last_text = useRef( text )
 
@@ -148,7 +170,10 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
 
         // Clear the saved draft only once committed, and only if it's still ours (another tab may have its own)
         flush()
-            .then( () => read_draft() === submitted && write_draft( `` ) )
+            .then( () => {
+                if( read_draft() === submitted ) write_draft( `` )
+                on_added?.( task.title )
+            } )
             .catch( () => toast( `Couldn't save “${ task.title }”. Your text is kept as a draft.` ) )
     }
 
@@ -161,6 +186,30 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const sync_scroll = () => {
         if( hl_ref.current && input_ref.current ) hl_ref.current.scrollLeft = input_ref.current.scrollLeft
     }
+
+    // Place the caret after the inserted token once React has rendered the new value
+    const caret = useRef( null )
+    useLayoutEffect( () => {
+        if( caret.current === null ) return
+        input_ref.current?.focus()
+        input_ref.current?.setSelectionRange( caret.current, caret.current )
+        caret.current = null
+    }, [ text ] )
+
+    // Accessory row: insert a token at the caret without blurring (the phone keyboard stays up)
+    const insert = token => {
+        const input = input_ref.current
+        const start = input?.selectionStart ?? text.length
+        const end = input?.selectionEnd ?? text.length
+        const before = text.slice( 0, start )
+        const spaced = `${ before && !before.endsWith( ` ` ) ? ` ` : `` }${ token }`
+        const next = `${ before }${ spaced }${ text.slice( end ) }`
+        caret.current = start + spaced.length
+        set_text( next )
+        set_confirm_create( false )
+    }
+
+    const keep_focus = event => event.preventDefault()
 
     const chips = parsed.spans.filter( ( { type } ) => type !== `literal` )
 
@@ -187,6 +236,19 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
                 />
             </div>
         </div>
+        { accessory && <div className="accessory" role="toolbar" aria-label="Insert">
+            <button type="button" onPointerDown={ keep_focus } onClick={ () => insert( `#` ) } aria-label="Project">#</button>
+            <button type="button" onPointerDown={ keep_focus } onClick={ () => insert( `@` ) } aria-label="Label">@</button>
+            <button type="button" onPointerDown={ keep_focus } onClick={ () => insert( `!` ) } aria-label="Priority">!</button>
+            <button type="button" onPointerDown={ keep_focus } onClick={ () => insert( `by ` ) } aria-label="Deadline">by</button>
+            <label aria-label="Date"><CalendarDays size={ 18 } strokeWidth={ 1.5 } aria-hidden />
+                <input type="date" tabIndex={ -1 } onChange={ ( { target } ) => {
+                    if( target.value ) insert( `${ target.value } ` )
+                    target.value = ``
+                } }
+                />
+            </label>
+        </div> }
         { !!chips.length && <div className="chips" aria-live="polite" aria-label="Understood">
             { chips.map( ( span, index ) => {
                 const Icon = span.unknown ? Plus : ICONS[ span.type ] || Tag

@@ -25,10 +25,21 @@ export default defineConfig( {
                 name: `Dolist`,
                 short_name: `Dolist`,
                 description: `Calm, fast task capture and planning`,
-                start_url: `/`,
+                // Stable identity: start_url moved to /capture, installs must stay the same app
+                id: `/`,
+                start_url: `/capture`,
+                scope: `/`,
                 display: `standalone`,
                 background_color: `#fafbfc`,
                 theme_color: `#376675`,
+                // Long-press the icon (Android, desktop)
+                shortcuts: [
+                    { name: `Add task`, short_name: `Add`, url: `/capture`, icons: [ { src: `logo192.png`, sizes: `192x192` } ] },
+                    { name: `Today`, url: `/today`, icons: [ { src: `logo192.png`, sizes: `192x192` } ] },
+                ],
+
+                // "Share to Dolist" from other apps lands in capture, prefilled (Android, desktop Chrome)
+                share_target: { action: `/capture`, method: `GET`, params: { title: `title`, text: `text`, url: `url` } },
                 icons: [
                     { src: `logo192.png`, sizes: `192x192`, type: `image/png` },
                     { src: `logo512.png`, sizes: `512x512`, type: `image/png` },
