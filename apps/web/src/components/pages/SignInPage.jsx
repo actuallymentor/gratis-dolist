@@ -5,7 +5,7 @@ import { Fingerprint, Mail, UserPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Page from '../atoms/Page'
 import { use_app_store } from '../../stores/app'
-import { create_passkey, email_sign_in, passkey_sign_in, passkeys_supported, send_email_link } from '../../modules/account'
+import { create_passkey, email_sign_in, passkey_sign_in, passkeys_supported, requested_link_here, send_email_link } from '../../modules/account'
 
 const Card = styled.section`
     display: grid; gap: 1rem; max-width: 26rem;
@@ -77,13 +77,18 @@ export default function SignInPage() {
         }
     }
 
-    // Opened from the email: use the token once, then drop it from the URL (history, screenshots)
+    // Opened from the email: use the token once, then drop it from the URL (history, screenshots).
+    // A link this browser never asked for (someone else's, sent to you) asks first: using it would sign
+    // you into their account
     const used_token = useRef( false )
+    const [ unasked_token, set_unasked_token ] = useState( null )
+    const use_token = link_token => run( async () => after_email( await email_sign_in( { token: link_token } ) ) )
     useEffect( () => {
         if( !token || used_token.current ) return
         used_token.current = true
         set_params( {}, { replace: true } )
-        run( async () => after_email( await email_sign_in( { token } ) ) )
+        if( requested_link_here() || account?.signed_in ) use_token( token )
+        else set_unasked_token( token )
     }, [ token ] )
 
     const send = event => {
@@ -118,6 +123,18 @@ export default function SignInPage() {
             <p>Add a passkey so next time you sign in with your fingerprint, face or device PIN. No email needed.</p>
             <button className="primary" onClick={ add_passkey } disabled={ busy }><Fingerprint size={ 18 } strokeWidth={ 1.5 } aria-hidden /> Add a passkey</button>
             <button onClick={ () => finish( `Signed in. Syncing.` ) }>Not now</button>
+        </Card>
+    </Page>
+
+    if( unasked_token ) return <Page title="Finish signing in?">
+        <Card>
+            <p>This browser didn't ask for this sign-in link. Continue only if you asked for it yourself, from another device or app. A link from someone else signs you into their account.</p>
+            <button className="primary" onClick={ () => {
+                set_unasked_token( null )
+                use_token( unasked_token )
+            } } disabled={ busy }
+            >Continue</button>
+            <button onClick={ () => set_unasked_token( null ) }>Cancel</button>
         </Card>
     </Page>
 

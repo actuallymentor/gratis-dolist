@@ -6,7 +6,7 @@ import { hold_unsaved } from '../modules/unsaved'
  * - update_ready: a new service worker is waiting and could not auto-activate
  * - install_prompt: the deferred `beforeinstallprompt` event, if the browser offered one
  * - unsaved: ids of components holding unsent input (drafts), which block silent auto-updates
- * - account: server session ( null = not checked yet ); sync_status: off | connecting | synced | offline | signed_out
+ * - account: server session ( null = not checked yet ); sync_status: off | connecting | synced | offline | signed_out | other_account
  */
 export const use_app_store = create( set => ( {
     update_ready: false,

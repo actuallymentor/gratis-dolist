@@ -50,6 +50,7 @@ app.get( `/api/session`, c => {
         now: Date.now(),
         signed_in: !!session,
         session_id: session?.session_id ?? null,
+        user_id: session?.owner_id ?? null,
         email: session?.email ?? null,
     } )
 } )

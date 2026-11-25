@@ -36,3 +36,5 @@
 - **Passkeys need a domain RP id**: never derive it from the request (wrangler dev rewrites URLs); `ORIGIN` var (prod in wrangler.jsonc, e2e `--var ORIGIN:http://localhost:8787`). 127.0.0.1 can't be an RP id → e2e must browse `localhost`.
 - e2e mail: `/api/e2e/outbox` (E2E only). Read it only after the UI says "Sent to …" or the race returns null.
 - Playwright hooks in an imported helper register only for the first spec a worker loads → export `close_devices`, call `test.afterEach` per spec.
+- WebKit ↔ wrangler dev stall reproduces with bursts of sequential POSTs (6 code attempts): a request just never completes, even serially. Not seen on Chromium. Server-only rules → test on Chromium only.
+- `useEffect( () => cond && promise )` / `return promise` inside an effect = React treats it as cleanup → blank page. Never return a promise from an effect.

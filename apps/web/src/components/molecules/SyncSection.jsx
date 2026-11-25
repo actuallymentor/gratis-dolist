@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { Download, Fingerprint, LogIn, LogOut, Mail, Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { use_app_store } from '../../stores/app'
-import { announce_account_change, api, end_sync, refresh_account } from '../../modules/sync'
+import { announce_account_change, api, end_sync, refresh_account, switch_device_account } from '../../modules/sync'
 import { create_passkey, email_sign_in, passkeys_supported, send_email_link } from '../../modules/account'
 
 const STATUS = {
@@ -12,6 +12,7 @@ const STATUS = {
     synced: `Synced`,
     offline: `Offline. Changes stay on this device and sync when you're back.`,
     signed_out: `This device was signed out. Your tasks are still here.`,
+    other_account: `Not syncing: the tasks on this device belong to another account.`,
 }
 
 const when = ms => new Date( ms ).toLocaleString( undefined, { dateStyle: `medium`, timeStyle: `short` } )
@@ -62,6 +63,13 @@ export default function SyncSection() {
             toast( error.message )
         }
     }
+
+    // Another account's tasks are here: they leave this device (still safe in that account), this one syncs in
+    const switch_account = attempt( async () => {
+        if( !confirm( `Remove the other account's tasks from this device and sync this account instead? They stay in the other account.` ) ) return
+        await switch_device_account()
+        toast( `Switched. Syncing this account.` )
+    } )
 
     const add_passkey = attempt( async () => {
         if( !await create_passkey( false ) ) return
@@ -132,6 +140,7 @@ export default function SyncSection() {
     return <>
         <div className="row">
             <span>Sync<small role="status" aria-label="Sync status">{ STATUS[ status ] ?? status }</small></span>
+            { status === `other_account` && <button onClick={ switch_account }>Use this account here</button> }
         </div>
 
         <div className="row">
@@ -141,8 +150,13 @@ export default function SyncSection() {
                 <button><Mail { ...icon } /> Add email</button>
             </form> }
             { email_sent_to && <form onSubmit={ confirm_email }>
-                <input className="code" value={ email_code } onChange={ ( { target: { value } } ) => set_email_code( value ) } placeholder="Code" aria-label="Code from the email" autoComplete="one-time-code" spellCheck={ false } required />
+                <input className="code" value={ email_code } onChange={ ( { target: { value } } ) => set_email_code( value ) } placeholder={ `Code sent to ${ email_sent_to }` } aria-label="Code from the email" autoComplete="one-time-code" spellCheck={ false } required />
                 <button>Confirm</button>
+                <button type="button" onClick={ () => {
+                    set_email_sent_to( null )
+                    set_email_code( `` )
+                } }
+                >Change email</button>
             </form> }
         </div>
 

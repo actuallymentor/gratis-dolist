@@ -51,8 +51,27 @@ export const refresh_account = async () => {
     }
 }
 
-// This tab's running connection
+// This tab's running connection, and whose account it syncs
 let connection = null
+let connected_user = null
+
+/**
+ * The account this device's local tasks belong to. Set by the first sync (tasks made before any sign-in
+ * join that account); kept after sign-out. Another account never syncs into them (see `begin_sync`).
+ */
+const OWNER_KEY = `dolist:owner`
+export const local_owner = () => {
+    try {
+        return localStorage.getItem( OWNER_KEY )
+    } catch {
+        return null
+    }
+}
+const set_local_owner = user_id => {
+    try {
+        localStorage.setItem( OWNER_KEY, user_id )
+    } catch { /* private mode: in-memory pin lost on reload, acceptable */ }
+}
 
 const url = () => `${ location.protocol === `https:` ? `wss` : `ws` }://${ location.host }/sync`
 
@@ -73,6 +92,7 @@ const signed_out = () => {
 export const end_sync = () => {
     connection?.stop()
     connection = null
+    connected_user = null
 }
 
 /**
@@ -82,7 +102,18 @@ export const begin_sync = async () => {
 
     const account = await refresh_account()
     if( account && !account.signed_in ) return set_sync_status( `off` )
+
+    // Signed in as someone else now (another tab switched accounts): drop the old account's socket
+    if( connection && account && account.user_id !== connected_user ) end_sync()
     if( connection ) return
+
+    // This device holds another account's tasks: never merge them in. Settings offers the switch.
+    // Offline (account unknown): keep trying as the device's own account; the server decides once reachable
+    const owner = local_owner()
+    if( account && owner && owner !== account.user_id ) return set_sync_status( `other_account` )
+    if( !account && !owner ) return
+    if( !owner ) set_local_owner( account.user_id )
+    connected_user = account?.user_id ?? owner
 
     connection = start_sync( dolist.store, {
         url: url(),
@@ -108,6 +139,20 @@ account_channel?.addEventListener( `message`, async () => {
     set_sync_status( `off` )
 } )
 
+/**
+ * Hands this device to the signed-in account: deletes the previous account's tasks here (they stay in
+ * that account), then syncs. Every tab follows through the tab channel.
+ */
+export const switch_device_account = async () => {
+    const account = await refresh_account()
+    if( !account?.signed_in ) return
+    dolist.store.transaction( () => dolist.store.delTables() )
+    await dolist.flush()
+    set_local_owner( account.user_id )
+    await begin_sync()
+    announce_account_change()
+}
+
 // Back after a while hidden (laptop sleep, phone lock): the socket may be silently dead, so start fresh
 const RESUME_AFTER = 60_000
 let hidden_at = 0
@@ -120,7 +165,7 @@ document.addEventListener( `visibilitychange`, () => {
 
 // Network gone: drop the socket (offline edits stay local); back: reconnect without waiting out the backoff
 window.addEventListener( `offline`, () => connection?.drop() )
-window.addEventListener( `online`, () => connection?.retry_now() )
+window.addEventListener( `online`, () => connection ? connection.retry_now() : begin_sync() )
 
 /**
  * Short human name for this browser, shown in the devices list.

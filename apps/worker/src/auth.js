@@ -26,6 +26,7 @@ const SCHEMA = `
     CREATE TABLE IF NOT EXISTS email_links ( token_hash TEXT PRIMARY KEY, code_hash TEXT NOT NULL, email TEXT NOT NULL, attach_to TEXT, source TEXT, created INTEGER NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0 );
     CREATE TABLE IF NOT EXISTS challenges ( challenge TEXT PRIMARY KEY, kind TEXT NOT NULL, user_id TEXT, expires INTEGER NOT NULL );
     CREATE TABLE IF NOT EXISTS failures ( at INTEGER NOT NULL, source TEXT );
+    CREATE TABLE IF NOT EXISTS email_sends ( email TEXT NOT NULL, source TEXT, at INTEGER NOT NULL );
     CREATE TABLE IF NOT EXISTS outbox ( email TEXT NOT NULL, link TEXT NOT NULL, code TEXT NOT NULL, at INTEGER NOT NULL );
 `
 
@@ -182,15 +183,22 @@ export class Auth extends DurableObject {
         const address = normalize_email( email )
         if( !address ) return { error: `bad_email` }
 
-        // Bound how often anyone can make us send mail, per inbox and per sender
-        this.sql.exec( `DELETE FROM email_links WHERE created < ?`, now - HOUR )
-        const [ { to_email, from_source } ] = this.rows( `SELECT count( CASE WHEN email = ? THEN 1 END ) AS to_email, count( CASE WHEN source = ? THEN 1 END ) AS from_source FROM email_links`, address, source )
-        if( to_email >= LINKS_PER_EMAIL || from_source >= LINKS_PER_SOURCE ) return { error: `throttled` }
-
+        // Secrets + hashes first: no await may sit between the quota check and the writes it guards
         const token = random_token()
         const code = random_code( 40 )
+        const token_hash = await sha256( token )
+        const code_hash = await sha256( normalize_code( code ) )
+
+        // Bound how often anyone can make us send mail, per inbox and per sender. Counted per send, not per
+        // open link: using or killing a link must not hand the allowance back
+        this.sql.exec( `DELETE FROM email_sends WHERE at < ?`, now - HOUR )
+        this.sql.exec( `DELETE FROM email_links WHERE expires <= ?`, now )
+        const [ { to_email, from_source } ] = this.rows( `SELECT count( CASE WHEN email = ? THEN 1 END ) AS to_email, count( CASE WHEN source = ? THEN 1 END ) AS from_source FROM email_sends`, address, source )
+        if( to_email >= LINKS_PER_EMAIL || from_source >= LINKS_PER_SOURCE ) return { error: `throttled` }
+
+        this.sql.exec( `INSERT INTO email_sends ( email, source, at ) VALUES ( ?, ?, ? )`, address, source, now )
         this.sql.exec( `INSERT INTO email_links ( token_hash, code_hash, email, attach_to, source, created, expires ) VALUES ( ?, ?, ?, ?, ?, ?, ? )`,
-            await sha256( token ), await sha256( normalize_code( code ) ), address, attach_to, source, now, now + LINK_TTL )
+            token_hash, code_hash, address, attach_to, source, now, now + LINK_TTL )
 
         const link = `${ this.env.ORIGIN }/signin?token=${ token }`
         if( this.env.E2E ) this.sql.exec( `INSERT INTO outbox ( email, link, code, at ) VALUES ( ?, ?, ?, ? )`, address, link, code, now )
@@ -216,29 +224,33 @@ export class Auth extends DurableObject {
         const code_hash = code ? await sha256( normalize_code( code ) ) : null
         const address = normalize_email( email )
 
+        // Find, check, then use up: all synchronous, so atomic inside the DO
         const [ link ] = token_hash
-            ? this.sql.exec( `DELETE FROM email_links WHERE token_hash = ? AND expires > ? RETURNING email, attach_to`, token_hash, now ).toArray()
+            ? this.rows( `SELECT token_hash, email, attach_to FROM email_links WHERE token_hash = ? AND expires > ?`, token_hash, now )
             : address && code_hash
-                ? this.sql.exec( `DELETE FROM email_links WHERE email = ? AND code_hash = ? AND expires > ? RETURNING email, attach_to`, address, code_hash, now ).toArray()
+                ? this.rows( `SELECT token_hash, email, attach_to FROM email_links WHERE email = ? AND code_hash = ? AND expires > ?`, address, code_hash, now )
                 : []
 
-        // A wrong code burns an attempt on every open link of that inbox
+        // A wrong code burns an attempt on that inbox's open codes. Spent codes die, their links still work
+        // (so a stranger guessing can't kill the link in your inbox)
         if( !link && !token_hash && address ) {
             this.sql.exec( `UPDATE email_links SET attempts = attempts + 1 WHERE email = ?`, address )
-            this.sql.exec( `DELETE FROM email_links WHERE attempts >= ?`, CODE_ATTEMPTS )
+            this.sql.exec( `UPDATE email_links SET code_hash = '' WHERE attempts >= ?`, CODE_ATTEMPTS )
         }
         if( !link ) return this.fail( now, source )
 
         // Adding an email to a signed-in account: only from inside that account (so nobody can sign a stranger
-        // into theirs), and only if no other account has it
+        // into theirs), and only if no other account has it. Refused = not used up: the code still works there
         if( link.attach_to ) {
             if( current_user !== link.attach_to ) return { error: `wrong_account` }
             const [ owner ] = this.rows( `SELECT id FROM users WHERE email = ?`, link.email )
             if( owner && owner.id !== link.attach_to ) return { error: `email_taken` }
+            this.sql.exec( `DELETE FROM email_links WHERE token_hash = ?`, link.token_hash )
             this.sql.exec( `UPDATE users SET email = ? WHERE id = ?`, link.email, link.attach_to )
             return { added: true }
         }
 
+        this.sql.exec( `DELETE FROM email_links WHERE token_hash = ?`, link.token_hash )
         const [ user ] = this.rows( `SELECT id FROM users WHERE email = ?`, link.email )
         const user_id = user?.id ?? this.create_user( now, link.email )
         return { ...await this.open_session( user_id, label, now ), created: !user }

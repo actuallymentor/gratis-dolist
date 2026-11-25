@@ -74,9 +74,11 @@ test( `an email link signs up, then signs in; it works once`, async ( { browser 
     await expect( a.page.getByRole( `heading`, { name: `Signed in` } ) ).toBeVisible()
     await expect( a.page ).not.toHaveURL( /token=/ )
 
-    // Used: a second browser opening the same link gets nothing
+    // Used: a second browser opening the same link gets nothing. It never asked for a link, so it asks first
     const b = await device( browser, id )
     await b.page.goto( link )
+    await expect( b.page.getByRole( `heading`, { name: `Finish signing in?` } ) ).toBeVisible()
+    await b.page.getByRole( `button`, { name: `Continue` } ).click()
     await expect( b.page.getByText( `That link or code didn't work` ) ).toBeVisible()
 } )
 
@@ -91,21 +93,67 @@ test( `the emailed code signs in where the link can't open (installed app)`, asy
     await expect( app.page.getByRole( `button`, { name: `From the browser` } ) ).toBeVisible()
 } )
 
-test( `wrong codes kill the link after five tries`, async ( { browser } ) => {
+test( `five wrong codes kill the code, not the link`, async ( { browser, browserName } ) => {
+    // A server rule: one engine is enough. WebKit stalls on bursts of requests to wrangler dev (GOTCHAS)
+    test.skip( browserName === `webkit`, `server rule, Chromium covers it` )
     const email = new_email()
     const a = await device( browser, tenant() )
     await request_link( a.page, email )
     const { code } = await mail( a.page, email )
-    for( let i = 0; i < 5; i++ ) {
-        await a.page.getByLabel( `Code from the email` ).fill( `WRONG-CODE${ i }` )
-        await a.page.getByRole( `button`, { name: `Sign in`, exact: true } ).click()
-        await expect( a.page.getByText( `That link or code didn't work` ).last() ).toBeVisible()
+    // Each try gets its answer before the next; all six are refused (the last, right one, too late)
+    for( const attempt of [ `WRONG-0`, `WRONG-1`, `WRONG-2`, `WRONG-3`, `WRONG-4`, code ] ) {
+        await a.page.getByLabel( `Code from the email` ).fill( attempt )
+        const [ response ] = await Promise.all( [
+            a.page.waitForResponse( response => response.url().includes( `/api/login/email` ) ),
+            a.page.getByRole( `button`, { name: `Sign in`, exact: true } ).click(),
+        ] )
+        expect( response.status() ).toBe( 401 )
     }
-    await a.page.getByLabel( `Code from the email` ).fill( code )
-    await a.page.getByRole( `button`, { name: `Sign in`, exact: true } ).click()
-    await expect( a.page.getByText( `That link or code didn't work` ).last() ).toBeVisible()
+    await expect( a.page.getByRole( `heading`, { name: `Signed in` } ) ).toHaveCount( 0 )
+
+    // The link in the inbox still works
+    await a.page.goto( ( await mail( a.page, email ) ).link )
+    await expect( a.page.getByRole( `heading`, { name: `Signed in` } ) ).toBeVisible()
+} )
+
+test( `another account never receives the tasks already on this device`, async ( { browser } ) => {
+    const id = tenant()
+    const first = new_email()
+    const second = new_email()
+    const a = await device( browser, id )
+    await sign_in_by_link( a.page, first )
+    await a.page.goto( `/inbox` )
+    await add( a.page, `Belongs to the first account` )
+
+    // Sign out, sign in as someone else: their sync stays off, nothing crosses
     await a.page.goto( `/settings` )
-    await expect( a.page.getByRole( `link`, { name: `Sign in` } ).last() ).toBeVisible()
+    await a.page.getByRole( `button`, { name: `Sign out`, exact: true } ).click()
+    await expect( a.page.getByText( `Signed out. Your tasks stay on this device.` ) ).toBeVisible()
+    await request_link( a.page, second )
+    await a.page.goto( ( await mail( a.page, second ) ).link )
+    await a.page.getByRole( `button`, { name: `Not now` } ).click()
+    await expect( status( a.page ) ).toHaveText( /another account/ )
+
+    const b = await device( browser, id )
+    await sign_in_by_link( b.page, second )
+    await b.page.goto( `/inbox` )
+    await b.page.waitForTimeout( 1_000 )
+    await expect( b.page.getByRole( `button`, { name: `Belongs to the first account` } ) ).toHaveCount( 0 )
+
+    // Handing the device over removes the first account's tasks here and syncs the second
+    await add( b.page, `Second account task` )
+    a.page.once( `dialog`, dialog => dialog.accept() )
+    await a.page.getByRole( `button`, { name: `Use this account here` } ).click()
+    await expect( status( a.page ) ).toHaveText( `Synced` )
+    await a.page.goto( `/inbox` )
+    await expect( a.page.getByRole( `button`, { name: `Second account task` } ) ).toBeVisible()
+    await expect( a.page.getByRole( `button`, { name: `Belongs to the first account` } ) ).toHaveCount( 0 )
+
+    // …and the first account still has them
+    const c = await device( browser, id )
+    await sign_in_by_link( c.page, first )
+    await c.page.goto( `/inbox` )
+    await expect( c.page.getByRole( `button`, { name: `Belongs to the first account` } ) ).toBeVisible()
 } )
 
 test( `a passkey creates an account, and signs back in after signing out`, async ( { browser, browserName } ) => {
