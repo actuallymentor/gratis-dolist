@@ -17,3 +17,8 @@
 - Email needs Cloudflare Email Service: onboard gratis.sh (dashboard → Compute → Email Service → Email Sending → Onboard Domain). Sending to arbitrary inboxes needs Workers Paid. Until then email links 503; passkeys work.
 - ENROLLMENT_CODE GH secret + DOLIST_ENROLLMENT_CODE in .env.local are now unused (safe to delete).
 - Email link also carries a code: an installed iOS PWA can't receive links (they open Safari).
+
+## 2026-11-25 — Prod email sending blocked
+- Accounts deployed (passkey sign-up/sign-in verified in prod). Email links fail: send() → `E_SENDER_DOMAIN_NOT_CONFIGURED`.
+- gratis.sh has no `cf-bounce` MX/SPF or `_dmarc` records ⇒ not onboarded for Email *Sending* (Routing ≠ Sending). Fix: dash → Compute → Email Service → Email Sending → Onboard Domain → gratis.sh, same account as the Worker.
+- Prod smoke left 3 throwaway passkey-only accounts (no email, no tasks).

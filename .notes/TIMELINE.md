@@ -16,3 +16,4 @@
 - 2026-11-25: M3 (PWA capture) started autonomously after another stall check: /capture start URL, shortcuts, share target, accessory row, iOS how-to in Settings.
 - 2026-11-25: CF token lacks R2 → backups now stored in Sync DO SQLite; ENROLLMENT_CODE uploaded by the deploy step from the GH secret.
 - 2026-11-25: User asked for login + registration (passkey + email link). Replaced single-owner codes (enrollment/pairing/recovery) with multi-user accounts; `/signin` page; email via Cloudflare Email Service binding; ENROLLMENT_CODE no longer used.
+- 2026-11-25 — User: always push to main (PR only on request). Accounts deployed; perf smoke add budget 1.5s→4s for CI; 503 email replies carry CF error code.
