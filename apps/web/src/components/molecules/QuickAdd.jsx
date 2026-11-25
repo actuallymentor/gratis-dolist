@@ -84,11 +84,10 @@ const segments_of = ( text, spans ) => {
  * @param {Object} props
  * @param {Object} [props.defaults] - project_id / scheduled for tasks added here
  * @param {boolean} [props.autofocus]
- * @param {string} [props.prefill] - text to put in the line (e.g. shared from another app); appended to a draft
  * @param {boolean} [props.accessory] - show the touch accessory row ( # @ ! by 📅 )
  * @param {Function} [props.on_added] - called with the saved task's title once it's on disk
  */
-export default function QuickAdd( { defaults = {}, placeholder = `Add a task… try "Call mum fri by sun !2 #home"`, autofocus, prefill, accessory, on_added } ) {
+export default function QuickAdd( { defaults = {}, placeholder = `Add a task… try "Call mum fri by sun !2 #home"`, autofocus, accessory, on_added } ) {
 
     const store = use_store()
     const projects = use_projects()
@@ -99,11 +98,7 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const id = useId()
     const input_ref = useRef( null )
     const hl_ref = useRef( null )
-    const [ text, set_text ] = useState( () => {
-        const draft = read_draft()
-        if( !prefill ) return draft
-        return draft ? `${ draft } ${ prefill }` : prefill
-    } )
+    const [ text, set_text ] = useState( read_draft )
     const [ confirm_create, set_confirm_create ] = useState( false )
     const last_text = useRef( text )
 

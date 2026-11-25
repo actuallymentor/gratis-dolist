@@ -23,17 +23,26 @@ test( `capture opens focused, adds to the Inbox, lists what was added`, async ( 
     await expect( page.getByRole( `button`, { name: `Buy stamps` } ) ).toBeVisible()
 } )
 
-test( `shared text arrives prefilled, literal, and only once`, async ( { page } ) => {
-    await page.goto( `/capture?title=${ encodeURIComponent( `Read #1 tips` ) }&url=${ encodeURIComponent( `https://example.com/a` ) }` )
-    await expect( quick_add( page ) ).toHaveValue( `"Read #1 tips" https://example.com/a` )
-    await expect( page ).toHaveURL( /\/capture$/ )
+test( `a share is its own literal task, kept until added, never mixed into the draft`, async ( { page } ) => {
+    await page.goto( `/capture` )
+    await quick_add( page ).fill( `Buy milk tomorrow` )
 
-    // A reload keeps the draft but doesn't add the share again
+    await page.goto( `/capture?title=${ encodeURIComponent( `Read #home tomorrow !1` ) }&url=${ encodeURIComponent( `https://example.com/a` ) }` )
+    const card = page.getByRole( `form`, { name: `Shared` } )
+    await expect( card.getByLabel( `Shared task title` ) ).toHaveValue( `Read #home tomorrow !1` )
+    await expect( quick_add( page ) ).toHaveValue( `Buy milk tomorrow` )
+
+    // Reload keeps it; adding saves it verbatim to the Inbox, then it's gone from the URL
     await page.reload()
-    await expect( quick_add( page ) ).toHaveValue( `"Read #1 tips" https://example.com/a` )
-    await quick_add( page ).press( `Enter` )
-    await page.goto( `/search?q=tips` )
-    await expect( page.getByRole( `button`, { name: /Read #1 tips/ } ) ).toBeVisible()
+    await card.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await expect( page ).toHaveURL( /\/capture$/ )
+    await expect( page.getByLabel( `Just added` ) ).toContainText( `Read #home tomorrow !1` )
+    await expect( quick_add( page ) ).toHaveValue( `Buy milk tomorrow` )
+
+    await page.goto( `/inbox` )
+    await page.getByRole( `button`, { name: `Read #home tomorrow !1` } ).click()
+    await expect( page.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `https://example.com/a` )
+    await expect( page.getByRole( `dialog` ).getByLabel( `Scheduled` ) ).toHaveValue( `` )
 } )
 
 test( `accessory row inserts tokens without losing focus`, async ( { page } ) => {

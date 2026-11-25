@@ -1,20 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { shared_text } from '../src/modules/share.js'
+import { shared_task } from '../src/modules/share.js'
 
-const share = query => shared_text( new URLSearchParams( query ) )
+const share = query => shared_task( new URLSearchParams( query ) )
 
-describe( `shared_text`, () => {
-    it( `quotes words, keeps the link bare`, () => {
-        expect( share( { title: `Read #1 tips @home`, url: `https://x.com/a#b` } ) ).toBe( `"Read #1 tips @home" https://x.com/a#b` )
+describe( `shared_task`, () => {
+
+    it( `title from the share, link in notes, words stay words`, () => {
+        expect( share( { title: `Read #home tomorrow !1`, url: `https://x.com/a#b` } ) ).toEqual( { title: `Read #home tomorrow !1`, notes: `https://x.com/a#b` } )
     } )
-    it( `drops repeats apps put in text`, () => {
-        expect( share( { title: `Great post`, text: `Great post https://x.com/p`, url: `https://x.com/p` } ) ).toBe( `"Great post https://x.com/p"` )
-        expect( share( { text: `same`, title: `same` } ) ).toBe( `"same"` )
+
+    it( `first line of text when there's no title, the rest in notes`, () => {
+        expect( share( { text: `Call the bank\nby fri please` } ) ).toEqual( { title: `Call the bank`, notes: `by fri please` } )
     } )
-    it( `nothing shared, nothing to add`, () => {
-        expect( share( {} ) ).toBe( `` )
+
+    it( `a link repeated in text is kept once, a different link is kept too`, () => {
+        expect( share( { title: `Post`, text: `Post https://x.com/p`, url: `https://x.com/p` } ) ).toEqual( { title: `Post`, notes: `Post https://x.com/p` } )
+        expect( share( { title: `Post`, text: `See https://x.com/p/related`, url: `https://x.com/p` } ) ).toEqual( { title: `Post`, notes: `See https://x.com/p/related\nhttps://x.com/p` } )
     } )
-    it( `never lets a quote break out`, () => {
-        expect( share( { text: `say "hi" #x` } ) ).toBe( `"say 'hi' #x"` )
+
+    it( `plain text has no added quotes; nothing shared is null`, () => {
+        expect( share( { text: `Buy milk` } ) ).toEqual( { title: `Buy milk`, notes: `` } )
+        expect( share( {} ) ).toBe( null )
     } )
+
 } )

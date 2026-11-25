@@ -1,18 +1,25 @@
 /**
- * Text shared from another app (Web Share Target, GET): title + text + url, deduplicated (apps often repeat
- * the title or URL inside `text`), quoted so a stray # or @ in it stays part of the title.
+ * A task from content shared by another app (Web Share Target, GET). Never parsed as quick-add grammar:
+ * shared prose is data, so `#home tomorrow` stays words. Title = the share's title or first line of text;
+ * everything else (remaining lines, the link) becomes notes. Apps often repeat the link inside `text`,
+ * so a part is dropped only when it appears as a whole word elsewhere.
  * @param {URLSearchParams} params
- * @returns {string} quick-add text, or `` when nothing was shared
+ * @returns {{ title: string, notes: string }|null}
  */
-export const shared_text = params => {
+export const shared_task = params => {
 
-    const parts = [ `title`, `text`, `url` ].map( key => params.get( key )?.trim() ).filter( Boolean )
+    const get = key => params.get( key )?.replace( /\r\n?/g, `\n` ).trim() || ``
+    const shared_title = get( `title` )
+    const lines = get( `text` ).split( `\n` ).map( line => line.trim() ).filter( Boolean )
+    const url = get( `url` )
 
-    // Drop a part that another part already contains (first one wins on exact repeats)
-    const unique = parts.filter( ( part, i ) => !parts.some( ( other, j ) => j !== i && ( other === part ? j < i : other.includes( part ) ) ) )
-    if( !unique.length ) return ``
+    const title = ( shared_title || lines[ 0 ] || url ).replace( /\s+/g, ` ` ).slice( 0, 300 )
+    if( !title ) return null
 
-    const link = unique.find( part => /^https?:\/\/\S+$/.test( part ) )
-    const words = unique.filter( part => part !== link ).join( ` ` ).replace( /"/g, `'` )
-    return [ words && `"${ words }"`, link ].filter( Boolean ).join( ` ` )
+    const has_word = ( haystack, needle ) => haystack.split( /\s+/ ).includes( needle )
+    const rest = lines.filter( ( line, index ) => !( index === 0 && !shared_title ) && line !== title )
+    const all_text = [ title, ...rest ].join( ` ` )
+    const notes = [ ...rest, url && !has_word( all_text, url ) ? url : `` ].filter( Boolean ).join( `\n` )
+
+    return { title, notes }
 }
