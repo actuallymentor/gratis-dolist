@@ -141,4 +141,24 @@ describe( `IndexedDB failures`, () => {
         expect( heard ).toHaveLength( 1 )
     } )
 
+    it( `the save after a failure repairs what the failed write dropped`, async () => {
+        const name = `db${ counter++ }`
+        const { store, flush, destroy } = await boot( name )
+
+        const quota = vi.spyOn( IDBDatabase.prototype, `transaction` ).mockImplementationOnce( () => {
+            throw new DOMException( `full`, `QuotaExceededError` )
+        } )
+        const id = add_task( store, { title: `Lost title`, notes: `and notes` } )
+        await expect( flush() ).rejects.toThrow( /full/ )
+        quota.mockRestore()
+
+        // A later edit to the same row must not leave a titleless row on disk
+        update_task( store, id, { notes: `edited` } )
+        await flush()
+        await destroy()
+
+        const reopened = await boot( name )
+        expect( reopened.store.getRow( `tasks`, id ) ).toMatchObject( { title: `Lost title`, notes: `edited` } )
+    } )
+
 } )

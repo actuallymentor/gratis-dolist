@@ -147,7 +147,7 @@ export default function HorizonsPage() {
 
             { !!outside.length && <Outside onToggle={ event => set_outside_open( event.currentTarget.open ) }>
                 <summary><ChevronDown size={ 16 } aria-hidden /> Outside this view ({ outside.length })</summary>
-                { outside_open && <TaskList tasks={ outside.slice( 0, shown.outside || PAGE * 4 ) } today={ today } on_complete={ on_complete } on_open={ on_open } on_move={ on_move } /> }
+                { outside_open && <TaskList tasks={ outside } today={ today } on_complete={ on_complete } on_open={ on_open } on_move={ on_move } /> }
             </Outside> }
         </Page>
 

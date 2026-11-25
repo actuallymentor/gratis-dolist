@@ -217,3 +217,44 @@ test( `submitting in one tab keeps another tab's draft`, async ( { page, context
     await other.reload()
     await expect( quick_add( other ) ).toHaveValue( `draft in tab B` )
 } )
+
+// ── Regressions from the M1 fix review ──────────────────────────────────────
+
+test( `closing an untouched detail panel keeps another tab's edit`, async ( { page, context } ) => {
+    await page.goto( `/inbox` )
+    await add( page, `Shared task` )
+    await page.getByRole( `button`, { name: `Shared task` } ).click()
+
+    const other = await context.newPage()
+    await other.goto( `/inbox` )
+    await other.getByRole( `button`, { name: `Shared task` } ).click()
+    await other.getByRole( `dialog` ).getByLabel( `Notes` ).fill( `from tab B` )
+    await other.keyboard.press( `Escape` )
+
+    // Tab A's open panel follows the stored value, and closing it writes nothing stale
+    await expect( page.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `from tab B` )
+    await page.keyboard.press( `Escape` )
+    await page.waitForTimeout( 300 )
+    await other.reload()
+    await other.getByRole( `button`, { name: `Shared task` } ).click()
+    await expect( other.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `from tab B` )
+} )
+
+test( `a tab opened from another gets its own draft`, async ( { page } ) => {
+    await page.goto( `/inbox` )
+    await quick_add( page ).fill( `draft in opener` )
+    const [ popup ] = await Promise.all( [ page.waitForEvent( `popup` ), page.evaluate( () => window.open( `/inbox` ) ) ] )
+    await popup.waitForLoadState()
+    await popup.waitForTimeout( 500 )
+    await quick_add( popup ).fill( `draft in popup` )
+    await page.waitForTimeout( 300 )
+    await page.reload()
+    await expect( quick_add( page ) ).toHaveValue( `draft in opener` )
+} )
+
+test( `a draft saved before per-tab keys is recovered`, async ( { page } ) => {
+    await page.goto( `/inbox` )
+    await page.evaluate( () => localStorage.setItem( `dolist:draft:quick-add`, `legacy draft` ) )
+    await page.reload()
+    await expect( quick_add( page ) ).toHaveValue( `legacy draft` )
+} )

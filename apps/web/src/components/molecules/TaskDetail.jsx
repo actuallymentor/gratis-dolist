@@ -54,6 +54,23 @@ const recur_text = recur => {
 }
 
 /**
+ * Edit buffer for one field. Follows the stored value (e.g. a change from another tab) until the user
+ * edits it, so committing an untouched field never writes stale text over newer data.
+ * @returns {[ string, Function, boolean, Function ]} value, setter, dirty (user edited, not yet stored),
+ *   settle( stored_text ) to call after saving, since what's stored may be normalised (trimmed, re-worded)
+ */
+const use_field = stored => {
+    const [ field, set_field ] = useState( { value: stored, base: stored } )
+
+    // Stored value moved: adopt it unless the user holds a different edit (render-phase derived state)
+    if( field.base !== stored && ( field.value === field.base || field.value === stored ) ) set_field( { value: stored, base: stored } )
+
+    const set_value = value => set_field( current => ( { ...current, value } ) )
+    const settle = value => set_field( { value, base: value } )
+    return [ field.value, set_value, field.value !== field.base, settle ]
+}
+
+/**
  * Task detail: every field of one task, edited in place, saved per field on change/blur.
  * Closing (Escape, close button, unmount) commits any text still being edited, and pending
  * edits mark the tab unsaved so an automatic app update never reloads them away.
@@ -70,40 +87,55 @@ export default function TaskDetail( { task, on_close } ) {
     const today = use_today()
     const all_tasks = use_tasks()
     const panel_ref = useRef( null )
-    const [ title, set_title ] = useState( task.title )
-    const [ notes, set_notes ] = useState( task.notes || `` )
-    const [ recur_input, set_recur_input ] = useState( recur_text( task.recur ) )
-    const [ label_input, set_label_input ] = useState( ( task.labels || [] ).join( `, ` ) )
+    const stored_labels = ( task.labels || [] ).join( `, ` )
+    const stored_recur = recur_text( task.recur )
+    const [ title, set_title, title_dirty, settle_title ] = use_field( task.title )
+    const [ notes, set_notes, notes_dirty, settle_notes ] = use_field( task.notes || `` )
+    const [ recur_input, set_recur_input, recur_dirty, settle_recur ] = use_field( stored_recur )
+    const [ label_input, set_label_input, labels_dirty, settle_labels ] = use_field( stored_labels )
     const [ sub_text, set_sub_text ] = useState( `` )
 
     const subtasks = all_tasks.filter( ( { parent_id } ) => parent_id === task.id )
     const save = patch => update_task( store, task.id, patch )
 
-    const initial_labels = ( task.labels || [] ).join( `, ` )
-    const initial_recur = recur_text( task.recur )
-
-    const save_title = () => title.trim() && title !== task.title && save( { title: title.trim() } )
-    const save_notes = () => notes !== ( task.notes || `` ) && save( { notes } )
+    // Each committer writes only what the user edited here
+    const save_title = () => {
+        if( !title_dirty || !title.trim() ) return
+        save( { title: title.trim() } )
+        settle_title( title.trim() )
+    }
+    const save_notes = () => {
+        if( !notes_dirty ) return
+        save( { notes } )
+        settle_notes( notes )
+    }
 
     // Only re-parse Repeats when its text changed, anchored on the task's own date (not today),
     // so tabbing through the field never shifts the schedule
     const save_recur = () => {
         const text = recur_input.trim()
-        if( text === initial_recur.trim() ) return
-        if( !text ) return save( { recur: null } )
+        if( !recur_dirty ) return
+        if( text === stored_recur.trim() ) return settle_recur( stored_recur )
+        if( !text ) {
+            save( { recur: null } )
+            return settle_recur( `` )
+        }
         const anchor = task.scheduled || task.deadline || today
         const { task: parsed, spans } = parse_quick_add( `x ${ text.startsWith( `every` ) ? text : `every ${ text }` }`, { today: anchor } )
 
         // Keep text the grammar didn't fully understand verbatim instead of half-parsing it
         const recur_span = spans.find( ( { type } ) => type === `recur` )
         const fully_parsed = parsed.recur && recur_span && parsed.title.trim() === `x`
-        save( { recur: fully_parsed ? parsed.recur : { raw: text, unparsed: true } } )
+        const recur = fully_parsed ? parsed.recur : { raw: text, unparsed: true }
+        save( { recur } )
+        settle_recur( recur_text( recur ) )
     }
 
     const save_labels = () => {
-        if( label_input === initial_labels ) return
+        if( !labels_dirty ) return
         const names = label_input.split( `,` ).map( name => name.trim().replace( /^@/, `` ) ).filter( Boolean )
         set_labels( store, task.id, names )
+        settle_labels( names.join( `, ` ) )
     }
 
     // Latest committers, for close/unmount without stale closures
@@ -115,7 +147,7 @@ export default function TaskDetail( { task, on_close } ) {
         save_recur()
     }
 
-    const dirty = title !== task.title || notes !== ( task.notes || `` ) || label_input !== initial_labels || recur_input.trim() !== initial_recur.trim()
+    const dirty = title_dirty || notes_dirty || labels_dirty || recur_dirty
     useEffect( () => mark_unsaved( id, dirty ), [ id, dirty, mark_unsaved ] )
 
     // Focus management: focus the panel on open; Escape commits, then closes; unmount commits too

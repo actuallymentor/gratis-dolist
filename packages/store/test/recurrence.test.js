@@ -1,7 +1,7 @@
 // Store ↔ @dolist/core recurrence wiring. Mocks the package with core's recurrence module
 // so this runs before core's index re-exports it.
 import { describe, expect, it, vi } from 'vitest'
-import { add_task, complete_task, create_dolist_store, get_task, uncomplete_task } from '../src/index.js'
+import { add_task, complete_task, completed_history, create_dolist_store, get_task, uncomplete_task } from '../src/index.js'
 
 vi.mock( `@dolist/core`, async () => ( { ...await import( `../../core/src/recurrence.js` ) } ) )
 
@@ -39,6 +39,9 @@ describe( `recurring completion via core`, () => {
         expect( complete_task( store, id, { today: `2026-11-24` } ) ).toBe( null )
         expect( get_task( store, id ) ).toMatchObject( { scheduled: `2026-11-24`, completed_at: expect.any( Number ) } )
         expect( store.getRowCount( `completions` ) ).toBe( 0 )
+
+        // Still reachable from Completed after Undo expires
+        expect( completed_history( store ).map( ( { task } ) => task.id ) ).toEqual( [ id ] )
 
         uncomplete_task( store, id )
         expect( get_task( store, id ) ).not.toHaveProperty( `completed_at` )

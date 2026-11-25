@@ -72,6 +72,9 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
     let loaded = false
     let last_load_error = null
 
+    // A failed write lost its changes; the next save rewrites everything (merged, never cleared) to repair disk
+    let repair_pending = false
+
     // Full read → hashed MergeableContent
     const get_persisted = async () => {
 
@@ -130,7 +133,9 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
         const rows = tx.objectStore( ROWS )
         const vals = tx.objectStore( VALS )
 
-        if( changes ) {
+        // A repair merges the full content: disk may miss rows a failed write dropped
+        const repairing = repair_pending
+        if( changes && !repairing ) {
 
             // Incremental: unhashed [ value, hlc ] stamps of touched cells only
             Object.entries( changes[ 0 ][ 0 ] ).forEach( ( [ table_id, [ table_rows ] ] ) => {
@@ -140,7 +145,7 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
                 vals.put( [ value, hlc, getCellHash( value, hlc ) ], [ ``, value_id ] )
             } )
 
-        } else if( loaded ) {
+        } else if( loaded && !repairing ) {
 
             // Full save: mergeable content already carries hashes
             const [ [ tables ], [ values ] ] = get_content()
@@ -153,7 +158,7 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
 
         } else {
 
-            // Full save without a successful load: disk may hold rows memory never saw (failed read),
+            // Repair, or full save without a successful load: disk may hold rows memory never saw (failed read),
             // so merge cell by cell and never clear. An empty store then writes nothing.
             const [ [ tables ], [ values ] ] = get_content()
             Object.entries( tables ).forEach( ( [ table_id, [ table_rows ] ] ) => {
@@ -164,6 +169,7 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
         }
 
         await tx_done( tx )
+        if( repairing ) repair_pending = false
     }
 
     // Remember load failures and report save failures before TinyBase swallows them
@@ -171,7 +177,10 @@ export const create_idb_persister = ( store, name, { durability = `strict`, on_i
         last_load_error = error
     }
     const load = reporting( get_persisted, remember_load_error )
-    const save = reporting( set_persisted, on_save_error )
+    const save = reporting( set_persisted, error => {
+        repair_pending = true
+        on_save_error( error )
+    } )
 
     // No cross-tab polling: the BroadcastChannel synchronizer covers tabs
     const persister = createCustomPersister( store, load, save, () => null, () => {}, on_ignored_error, MERGEABLE_STORE_ONLY )

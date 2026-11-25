@@ -280,8 +280,11 @@ export const completed_history = ( store, { limit = 100 } = {} ) => {
 
     const live = get_tasks( store, { include_completed: true } )
     const entries = live.flatMap( task => {
-        if( task.completions ) return task.completions.map( ( { occurrence, at, skipped } ) => ( { task, at, occurrence, skipped } ) )
-        return is_done( task ) ? [ { task, at: task.completed_at } ] : []
+        const occurrences = ( task.completions || [] ).map( ( { occurrence, at, skipped } ) => ( { task, at, occurrence, skipped } ) )
+
+        // A one-off completion (incl. an unparsed repeat rule) has only completed_at
+        const stamped = is_done( task ) && !occurrences.some( ( { at } ) => at === task.completed_at )
+        return stamped ? [ ...occurrences, { task, at: task.completed_at } ] : occurrences
     } )
 
     return entries.sort( ( a, b ) => b.at - a.at ).slice( 0, limit )
