@@ -104,7 +104,8 @@ app.post( `/api/email-link`, async c => {
         await send_link( c.env, result, !!session )
     } catch ( error ) {
         console.error( `email:`, error?.code, error?.message )
-        return c.json( { error: `Couldn't send the email right now. Try a passkey, or try again later.` }, 503 )
+        // The code (E_SENDER_DOMAIN_NOT_AVAILABLE, …) says nothing private and makes a misconfigured domain obvious
+        return c.json( { error: `Couldn't send the email right now. Try a passkey, or try again later.`, code: error?.code ?? null }, 503 )
     }
     return c.json( { sent_to: result.email } )
 } )
