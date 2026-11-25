@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@dolist/core": "^0.0.0",
+    "@simplewebauthn/browser": "^13.3.0",
     "lucide-react": "^1.79.0",
     "mentie": "^0.5.4",
     "react": "^19.3.1",

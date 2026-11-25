@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Download, KeyRound, Link2, LogOut, Save, Trash2 } from 'lucide-react'
+import { Link } from 'react-router'
+import { Download, Fingerprint, LogIn, LogOut, Mail, Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { use_app_store } from '../../stores/app'
-import { announce_account_change, api, begin_sync, device_label, end_sync, refresh_account } from '../../modules/sync'
-import { download_json } from '../../modules/todoist'
+import { announce_account_change, api, end_sync, refresh_account } from '../../modules/sync'
+import { create_passkey, email_sign_in, passkeys_supported, send_email_link } from '../../modules/account'
 
 const STATUS = {
     off: `Not syncing`,
@@ -14,29 +15,33 @@ const STATUS = {
 }
 
 const when = ms => new Date( ms ).toLocaleString( undefined, { dateStyle: `medium`, timeStyle: `short` } )
+const icon = { size: 16, strokeWidth: 1.5, 'aria-hidden': true }
 
 /**
- * Settings → Sync: sign in with one code (enrollment, pairing or recovery), pair devices,
- * see + revoke devices, nightly backups (download one, then Import file = restore).
+ * Settings → Sync: account (email, passkeys), devices with sign out, nightly backups
+ * (download one, then Import file = restore). Signing in lives on /signin.
  * Renders rows for the parent's <Rows> container.
  */
 export default function SyncSection() {
 
     const account = use_app_store( state => state.account )
     const status = use_app_store( state => state.sync_status )
-    const [ code, set_code ] = useState( `` )
-    const [ busy, set_busy ] = useState( false )
-    const [ recovery, set_recovery ] = useState( null )
-    const [ pairing, set_pairing ] = useState( null )
     const [ devices, set_devices ] = useState( [] )
+    const [ passkeys, set_passkeys ] = useState( [] )
     const [ backups, set_backups ] = useState( [] )
+
+    // Adding an email: address, then the code from the mail
+    const [ new_email, set_new_email ] = useState( `` )
+    const [ email_sent_to, set_email_sent_to ] = useState( null )
+    const [ email_code, set_email_code ] = useState( `` )
 
     const signed_in = !!account?.signed_in
 
-    // Devices + backups load independently (a backup outage must never hide Sign out), and again once
-    // sync recovers; a failed load keeps what was shown
+    // Lists load independently (a backup outage must never hide Sign out), and again once sync recovers;
+    // a failed load keeps what was shown
     const load_lists = () => {
         api( `/api/devices` ).then( set_devices, () => {} )
+        api( `/api/passkeys` ).then( set_passkeys, () => {} )
         api( `/api/snapshots` ).then( set_backups, () => {} )
     }
     const synced = status === `synced`
@@ -49,47 +54,42 @@ export default function SyncSection() {
         refresh_account()
     }, [] )
 
-    const sign_in = async event => {
+    // Every action: errors become a toast
+    const attempt = action => async ( ...args ) => {
+        try {
+            await action( ...args )
+        } catch ( error ) {
+            toast( error.message )
+        }
+    }
+
+    const add_passkey = attempt( async () => {
+        if( !await create_passkey( false ) ) return
+        toast( `Passkey added` )
+        load_lists()
+    } )
+
+    const remove_passkey = attempt( async key => {
+        await api( `/api/passkeys/${ encodeURIComponent( key.id ) }`, { method: `DELETE` } )
+        toast( `Passkey removed. Also delete it from your password manager.` )
+        load_lists()
+    } )
+
+    const send_email = attempt( async event => {
         event.preventDefault()
-        if( !code.trim() || busy ) return
-        set_busy( true )
-        try {
-            const { recovery_codes } = await api( `/api/login`, { method: `POST`, body: { code: code.trim(), label: device_label() } } )
-            set_code( `` )
-            if( recovery_codes ) set_recovery( recovery_codes )
-            await begin_sync()
-            announce_account_change()
-            toast( `Signed in. Syncing.` )
-        } catch ( error ) {
+        const { sent_to } = await send_email_link( new_email.trim() )
+        set_email_sent_to( sent_to )
+    } )
 
-            // The reply can be cut off after the session was created (the code is used up by then): check
-            const account = await refresh_account()
-            if( !account?.signed_in ) return toast( error.message )
-            set_code( `` )
-            await begin_sync()
-            announce_account_change()
-            toast( `Signed in, but the reply was cut off. If this was your first device, make new recovery codes below.`, { duration: 10_000 } )
-        } finally {
-            set_busy( false )
-        }
-    }
-
-    const rotate_recovery = async () => {
-        try {
-            const { recovery_codes } = await api( `/api/recovery-codes`, { method: `POST` } )
-            set_recovery( recovery_codes )
-        } catch ( error ) {
-            toast( error.message )
-        }
-    }
-
-    const pair = async () => {
-        try {
-            set_pairing( await api( `/api/pair`, { method: `POST` } ) )
-        } catch ( error ) {
-            toast( error.message )
-        }
-    }
+    const confirm_email = attempt( async event => {
+        event.preventDefault()
+        await email_sign_in( { email: email_sent_to, code: email_code.trim() } )
+        set_email_sent_to( null )
+        set_email_code( `` )
+        set_new_email( `` )
+        await refresh_account()
+        toast( `Email added` )
+    } )
 
     const revoke = async device => {
         const self = device.id === account?.session_id
@@ -121,28 +121,12 @@ export default function SyncSection() {
         }
     }
 
-    // Shown once, right after enrollment
-    if( recovery ) return <div className="row">
-        <span>
-            Recovery codes
-            <small>Each signs in once if you lose every device. Save them somewhere safe, they won't be shown again.</small>
-            <code className="codes" aria-label="Recovery codes">{ recovery.join( `\n` ) }</code>
-        </span>
-        <form onSubmit={ event => event.preventDefault() }>
-            <button type="button" onClick={ () => download_json( `dolist-recovery-codes.txt`, recovery.join( `\n` ) ) }><Download size={ 16 } strokeWidth={ 1.5 } aria-hidden /> Download</button>
-            <button type="button" onClick={ () => set_recovery( null ) }>I saved them</button>
-        </form>
-    </div>
-
     if( !signed_in ) return <div className="row">
         <span>
             Sync across devices
-            <small role="status">{ status === `signed_out` ? STATUS.signed_out : `First device: your enrollment code. Others: a pairing code from a signed-in device, or a recovery code.` }</small>
+            <small role="status">{ status === `signed_out` ? STATUS.signed_out : `Sign in with a passkey or an email link. Your tasks stay on this device either way.` }</small>
         </span>
-        <form onSubmit={ sign_in }>
-            <input className="code" value={ code } onChange={ ( { target: { value } } ) => set_code( value ) } placeholder="Code" aria-label="Sign-in code" autoComplete="one-time-code" autoCapitalize="characters" spellCheck={ false } />
-            <button disabled={ busy }><KeyRound size={ 16 } strokeWidth={ 1.5 } aria-hidden /> { busy ? `Signing in…` : `Sign in` }</button>
-        </form>
+        <Link to="/signin"><LogIn { ...icon } /> Sign in</Link>
     </div>
 
     return <>
@@ -151,14 +135,25 @@ export default function SyncSection() {
         </div>
 
         <div className="row">
-            <span>
-                Pair a device
-                <small>{ pairing
-                    ? <>On the other device: Settings → Sync → enter <code className="pair" aria-label="Pairing code">{ pairing.code }</code>. Works once, until { new Date( pairing.expires ).toLocaleTimeString( undefined, { timeStyle: `short` } ) }.</>
-                    : `Shows a one-time code to sign in another phone or computer.` }</small>
-            </span>
-            <button onClick={ pair }><Link2 size={ 16 } strokeWidth={ 1.5 } aria-hidden /> { pairing ? `New code` : `Pair` }</button>
+            <span>Email<small>{ account.email ?? `None yet. Add one to sign in with an email link.` }</small></span>
+            { !account.email && !email_sent_to && <form onSubmit={ send_email }>
+                <input className="email" type="email" value={ new_email } onChange={ ( { target: { value } } ) => set_new_email( value ) } placeholder="you@example.com" aria-label="New email" autoComplete="email" required />
+                <button><Mail { ...icon } /> Add email</button>
+            </form> }
+            { email_sent_to && <form onSubmit={ confirm_email }>
+                <input className="code" value={ email_code } onChange={ ( { target: { value } } ) => set_email_code( value ) } placeholder="Code" aria-label="Code from the email" autoComplete="one-time-code" spellCheck={ false } required />
+                <button>Confirm</button>
+            </form> }
         </div>
+
+        { passkeys.map( key => <div className="row" key={ key.id }>
+            <span>Passkey: { key.label }<small>Added { when( key.created ) }{ key.last_used ? `, last used ${ when( key.last_used ) }` : `` }</small></span>
+            <button onClick={ () => remove_passkey( key ) } aria-label={ `Remove passkey ${ key.label }` }><Trash2 { ...icon } /> Remove</button>
+        </div> ) }
+        { passkeys_supported() && <div className="row">
+            <span>{ passkeys.length ? `Another passkey` : `Passkey` }<small>Sign in with your fingerprint, face or device PIN.</small></span>
+            <button onClick={ add_passkey }><Fingerprint { ...icon } /> Add passkey</button>
+        </div> }
 
         { devices.map( device => {
             const self = device.id === account?.session_id
@@ -169,11 +164,6 @@ export default function SyncSection() {
                 </button>
             </div>
         } ) }
-
-        <div className="row">
-            <span>Recovery codes<small>Sign in once each if you lose every device. Making new ones voids the old.</small></span>
-            <button onClick={ rotate_recovery }><KeyRound size={ 16 } strokeWidth={ 1.5 } aria-hidden /> New codes</button>
-        </div>
 
         <div className="row">
             <span>Backups<small>Nightly, last 30 kept. To restore, download one and use Import file below: tasks in the backup return as they were then, tasks added since stay.</small></span>

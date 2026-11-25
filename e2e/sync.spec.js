@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { ENROLLMENT_CODE } from '../playwright.config.js'
+import { authenticator, close_devices, device, mail, new_email, request_link, sign_in_by_code, sign_in_by_link, status, tenant } from './account.js'
 
-// M2 exit criteria against real wrangler dev (Worker + Auth/Sync DOs).
-// Each test is its own owner: the E2E-only `dolist_tenant` cookie picks an isolated Auth DO.
+// M2 exit criteria against real wrangler dev (Worker + Auth/Sync DOs), signing in like a person:
+// email link (or its code), passkeys. Each test is its own deployment (see ./account.js).
+
+test.afterEach( close_devices )
 
 const quick_add = page => page.getByRole( `textbox`, { name: `New task` } )
 // Waits for the durable ack: the saved draft is cleared only once the task is committed to IndexedDB
@@ -11,52 +13,20 @@ const add = async ( page, text ) => {
     await quick_add( page ).press( `Enter` )
     await expect.poll( () => page.evaluate( () => localStorage.getItem( `dolist:draft:quick-add:${ sessionStorage.getItem( `dolist:tab` ) }` ) ) ).toBe( null )
 }
-const status = page => page.getByLabel( `Sync status` )
 
-// A browser of this test's owner. Closed after each test: open sockets pile up otherwise, and WebKit's
-// per-host connection pool runs dry (later requests just queue)
-const opened = []
-test.afterEach( async () => {
-    await Promise.all( opened.splice( 0 ).map( context => context.close() ) )
-} )
-const device = async ( browser, tenant ) => {
-    const context = await browser.newContext()
-    opened.push( context )
-    await context.addCookies( [ { name: `dolist_tenant`, value: tenant, url: `http://localhost:8787` } ] )
-    return { context, page: await context.newPage() }
+// Two browsers on one account
+const two_devices = async browser => {
+    const id = tenant()
+    const email = new_email()
+    const a = await device( browser, id )
+    const b = await device( browser, id )
+    await sign_in_by_link( a.page, email )
+    await sign_in_by_link( b.page, email )
+    return { a, b, email, id }
 }
-
-const sign_in = async ( page, code ) => {
-    await page.goto( `/settings` )
-    await page.getByLabel( `Sign-in code` ).fill( code )
-    await page.getByRole( `button`, { name: `Sign in` } ).click()
-}
-
-// First device: enrollment, returns the recovery codes shown once
-const enroll = async page => {
-    await sign_in( page, ENROLLMENT_CODE )
-    const codes = ( await page.getByLabel( `Recovery codes` ).textContent() ).split( `\n` )
-    await page.getByRole( `button`, { name: `I saved them` } ).click()
-    await expect( status( page ) ).toHaveText( `Synced` )
-    return codes
-}
-
-const pair = async ( from, to ) => {
-    await from.getByRole( `button`, { name: `Pair` } ).click()
-    const code = await from.getByLabel( `Pairing code` ).textContent()
-    await sign_in( to, code )
-    await expect( status( to ) ).toHaveText( `Synced` )
-}
-
-const owner = () => crypto.randomUUID()
 
 test( `two browsers sync, including offline edits on both sides`, async ( { browser } ) => {
-    const tenant = owner()
-    const a = await device( browser, tenant )
-    const b = await device( browser, tenant )
-    const codes = await enroll( a.page )
-    expect( codes ).toHaveLength( 10 )
-    await pair( a.page, b.page )
+    const { a, b } = await two_devices( browser )
 
     // Online: A → B
     await a.page.goto( `/inbox` )
@@ -82,40 +52,134 @@ test( `two browsers sync, including offline edits on both sides`, async ( { brow
 } )
 
 test( `a revoked device drops within seconds and keeps its tasks`, async ( { browser } ) => {
-    const tenant = owner()
-    const a = await device( browser, tenant )
-    const b = await device( browser, tenant )
-    await enroll( a.page )
-    await pair( a.page, b.page )
+    const { a, b } = await two_devices( browser )
 
     await a.page.reload()
     await a.page.getByRole( `button`, { name: /^Sign out .+/ } ).click()
     await expect( b.page.getByText( `This device was signed out` ) ).toBeVisible( { timeout: 5_000 } )
 
-    // Pairing codes are single-use; the revoked device can't come back on its own
+    // Its tasks stay; it can't come back without signing in again
     await b.page.goto( `/inbox` )
     await add( b.page, `Still local` )
     await expect( b.page.getByRole( `button`, { name: `Still local` } ) ).toBeVisible()
 } )
 
-test( `recovery codes sign in once`, async ( { browser } ) => {
-    const tenant = owner()
-    const a = await device( browser, tenant )
-    const [ first ] = await enroll( a.page )
+test( `an email link signs up, then signs in; it works once`, async ( { browser } ) => {
+    const id = tenant()
+    const email = new_email()
+    const a = await device( browser, id )
+    await request_link( a.page, email )
+    const { link } = await mail( a.page, email )
+    await a.page.goto( link )
+    await expect( a.page.getByRole( `heading`, { name: `Signed in` } ) ).toBeVisible()
+    await expect( a.page ).not.toHaveURL( /token=/ )
 
-    const lost = await device( browser, tenant )
-    await sign_in( lost.page, first.toLowerCase() )
-    await expect( status( lost.page ) ).toHaveText( `Synced` )
+    // Used: a second browser opening the same link gets nothing
+    const b = await device( browser, id )
+    await b.page.goto( link )
+    await expect( b.page.getByText( `That link or code didn't work` ) ).toBeVisible()
+} )
 
-    const again = await device( browser, tenant )
-    await sign_in( again.page, first )
-    await expect( again.page.getByText( `That code didn't work` ) ).toBeVisible()
+test( `the emailed code signs in where the link can't open (installed app)`, async ( { browser } ) => {
+    const { a, email, id } = await two_devices( browser )
+    await a.page.goto( `/inbox` )
+    await add( a.page, `From the browser` )
+
+    const app = await device( browser, id )
+    await sign_in_by_code( app.page, email )
+    await app.page.goto( `/inbox` )
+    await expect( app.page.getByRole( `button`, { name: `From the browser` } ) ).toBeVisible()
+} )
+
+test( `wrong codes kill the link after five tries`, async ( { browser } ) => {
+    const email = new_email()
+    const a = await device( browser, tenant() )
+    await request_link( a.page, email )
+    const { code } = await mail( a.page, email )
+    for( let i = 0; i < 5; i++ ) {
+        await a.page.getByLabel( `Code from the email` ).fill( `WRONG-CODE${ i }` )
+        await a.page.getByRole( `button`, { name: `Sign in`, exact: true } ).click()
+        await expect( a.page.getByText( `That link or code didn't work` ).last() ).toBeVisible()
+    }
+    await a.page.getByLabel( `Code from the email` ).fill( code )
+    await a.page.getByRole( `button`, { name: `Sign in`, exact: true } ).click()
+    await expect( a.page.getByText( `That link or code didn't work` ).last() ).toBeVisible()
+    await a.page.goto( `/settings` )
+    await expect( a.page.getByRole( `link`, { name: `Sign in` } ).last() ).toBeVisible()
+} )
+
+test( `a passkey creates an account, and signs back in after signing out`, async ( { browser, browserName } ) => {
+    test.skip( browserName !== `chromium`, `virtual authenticator is Chromium-only` )
+    const a = await device( browser, tenant() )
+    await a.page.goto( `/signin` )
+    await authenticator( a.page )
+    await a.page.getByRole( `button`, { name: `Create an account with a passkey` } ).click()
+    await expect( status( a.page ) ).toHaveText( `Synced` )
+    await expect( a.page.getByText( /^Passkey: / ) ).toBeVisible()
+
+    // The only way in: can't be removed
+    await a.page.getByRole( `button`, { name: /^Remove passkey/ } ).click()
+    await expect( a.page.getByText( `This is your only way to sign in` ) ).toBeVisible()
+
+    await a.page.getByRole( `button`, { name: `Sign out`, exact: true } ).click()
+    await expect( a.page.getByText( `Signed out. Your tasks stay on this device.` ) ).toBeVisible()
+    await a.page.goto( `/signin` )
+    await a.page.getByRole( `button`, { name: `Sign in with a passkey` } ).click()
+    await expect( status( a.page ) ).toHaveText( `Synced` )
+} )
+
+test( `a passkey added after email sign-in signs in another device`, async ( { browser, browserName } ) => {
+    test.skip( browserName !== `chromium`, `virtual authenticator is Chromium-only` )
+    const id = tenant()
+    const email = new_email()
+    const a = await device( browser, id )
+    const key = await authenticator( a.page )
+    await request_link( a.page, email )
+    await a.page.goto( ( await mail( a.page, email ) ).link )
+    await a.page.getByRole( `button`, { name: `Add a passkey` } ).click()
+    await expect( status( a.page ) ).toHaveText( `Synced` )
+    await a.page.goto( `/inbox` )
+    await add( a.page, `Before the passkey device` )
+
+    // A synced passkey (password manager) shows up on another device
+    const { credentials } = await key.cdp.send( `WebAuthn.getCredentials`, { authenticatorId: key.id } )
+    const b = await device( browser, id )
+    await b.page.goto( `/signin` )
+    const other = await authenticator( b.page )
+    await other.cdp.send( `WebAuthn.addCredential`, { authenticatorId: other.id, credential: credentials[ 0 ] } )
+    await b.page.getByRole( `button`, { name: `Sign in with a passkey` } ).click()
+    await expect( status( b.page ) ).toHaveText( `Synced` )
+    await b.page.goto( `/inbox` )
+    await expect( b.page.getByRole( `button`, { name: `Before the passkey device` } ) ).toBeVisible()
+} )
+
+test( `a passkey account adds an email, confirmed by code`, async ( { browser, browserName } ) => {
+    test.skip( browserName !== `chromium`, `virtual authenticator is Chromium-only` )
+    const id = tenant()
+    const email = new_email()
+    const a = await device( browser, id )
+    await a.page.goto( `/signin` )
+    await authenticator( a.page )
+    await a.page.getByRole( `button`, { name: `Create an account with a passkey` } ).click()
+    await expect( status( a.page ) ).toHaveText( `Synced` )
+
+    await a.page.getByLabel( `New email` ).fill( email )
+    await a.page.getByRole( `button`, { name: `Add email` } ).click()
+    await expect( a.page.getByLabel( `Code from the email` ) ).toBeVisible()
+    await a.page.getByLabel( `Code from the email` ).fill( ( await mail( a.page, email ) ).code )
+    await a.page.getByRole( `button`, { name: `Confirm` } ).click()
+    await expect( a.page.getByText( `Email added` ) ).toBeVisible()
+    await expect( a.page.getByText( email ) ).toBeVisible()
+
+    // Now that email signs in to the same account
+    const b = await device( browser, id )
+    await sign_in_by_link( b.page, email )
+    await expect( b.page.getByText( /^Passkey: / ) ).toBeVisible()
 } )
 
 test( `backup now, download, import into an empty browser = restore`, async ( { browser } ) => {
-    const tenant = owner()
-    const a = await device( browser, tenant )
-    await enroll( a.page )
+    const a = await device( browser, tenant() )
+    await sign_in_by_link( a.page, new_email() )
     await a.page.goto( `/inbox` )
     await add( a.page, `Backed up task` )
     await expect( a.page.getByRole( `button`, { name: `Backed up task` } ) ).toBeVisible()
@@ -136,17 +200,15 @@ test( `backup now, download, import into an empty browser = restore`, async ( { 
 } )
 
 test( `the API refuses other origins and signed-out callers`, async ( { request } ) => {
-    expect( ( await request.post( `/api/login`, { data: { code: ENROLLMENT_CODE }, headers: { Origin: `https://evil.example` } } ) ).status() ).toBe( 403 )
+    expect( ( await request.post( `/api/email-link`, { data: { email: new_email() }, headers: { Origin: `https://evil.example` } } ) ).status() ).toBe( 403 )
+    expect( ( await request.post( `/api/login/email`, { data: { token: `nope` }, headers: { Origin: `https://evil.example` } } ) ).status() ).toBe( 403 )
+    expect( ( await request.get( `/api/passkeys` ) ).status() ).toBe( 401 )
     expect( ( await request.get( `/api/devices` ) ).status() ).toBe( 401 )
     expect( ( await request.get( `/api/snapshots` ) ).status() ).toBe( 401 )
 } )
 
 test( `a session revoked mid-reconnect stays out`, async ( { browser } ) => {
-    const tenant = owner()
-    const a = await device( browser, tenant )
-    const b = await device( browser, tenant )
-    await enroll( a.page )
-    await pair( a.page, b.page )
+    const { a, b } = await two_devices( browser )
 
     // B goes offline (socket dropped), gets revoked meanwhile, then comes back
     await b.context.setOffline( true )
@@ -157,50 +219,15 @@ test( `a session revoked mid-reconnect stays out`, async ( { browser } ) => {
 } )
 
 test( `signing in one tab starts sync in the other open tabs`, async ( { browser } ) => {
-    const a = await device( browser, owner() )
+    const a = await device( browser, tenant() )
     const sibling = await a.context.newPage()
     await sibling.goto( `/settings` )
-    await enroll( a.page )
+    await sign_in_by_link( a.page, new_email() )
     await expect( status( sibling ) ).toHaveText( `Synced` )
 } )
 
-test( `a lost enrollment response can be retried`, async ( { browser, request } ) => {
-    const tenant = owner()
-
-    // Enroll from outside the browser and drop the response (no cookie, no recovery codes)
-    const lost = await request.post( `/api/login`, { data: { code: ENROLLMENT_CODE }, headers: { Origin: `http://localhost:8787`, Cookie: `dolist_tenant=${ tenant }` } } )
-    expect( lost.status() ).toBe( 200 )
-
-    // The real browser enrolls again and gets a working owner
-    const a = await device( browser, tenant )
-    expect( await enroll( a.page ) ).toHaveLength( 10 )
-
-    // Now it's closed
-    const late = await device( browser, tenant )
-    await sign_in( late.page, ENROLLMENT_CODE )
-    await expect( late.page.getByText( `That code didn't work` ) ).toBeVisible()
-} )
-
-test( `new recovery codes void the old ones`, async ( { browser } ) => {
-    const tenant = owner()
-    const a = await device( browser, tenant )
-    const [ old_code ] = await enroll( a.page )
-    await a.page.getByRole( `button`, { name: `New codes` } ).click()
-    const [ new_code ] = ( await a.page.getByLabel( `Recovery codes` ).textContent() ).split( `\n` )
-
-    const b = await device( browser, tenant )
-    await sign_in( b.page, old_code )
-    await expect( b.page.getByText( `That code didn't work` ) ).toBeVisible()
-    await sign_in( b.page, new_code )
-    await expect( status( b.page ) ).toHaveText( `Synced` )
-} )
-
 test( `airplane-mode capture syncs later, exactly once`, async ( { browser } ) => {
-    const tenant = owner()
-    const phone = await device( browser, tenant )
-    const laptop = await device( browser, tenant )
-    await enroll( phone.page )
-    await pair( phone.page, laptop.page )
+    const { a: phone, b: laptop } = await two_devices( browser )
 
     await phone.page.goto( `/capture` )
     await phone.context.setOffline( true )

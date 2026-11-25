@@ -6,6 +6,7 @@ import SettingsPage from '../components/pages/SettingsPage'
 import SearchPage from '../components/pages/SearchPage'
 import CompletedPage from '../components/pages/CompletedPage'
 import CapturePage from '../components/pages/CapturePage'
+import SignInPage from '../components/pages/SignInPage'
 
 export default function AppRoutes() {
     return <Routes>
@@ -17,6 +18,7 @@ export default function AppRoutes() {
         <Route path="/search" element={ <SearchPage /> } />
         <Route path="/completed" element={ <CompletedPage /> } />
         <Route path="/settings" element={ <SettingsPage /> } />
+        <Route path="/signin" element={ <SignInPage /> } />
         <Route path="*" element={ <Navigate to="/today" replace /> } />
     </Routes>
 }

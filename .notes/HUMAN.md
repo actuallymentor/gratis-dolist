@@ -11,3 +11,9 @@
 - Fix: add "Workers R2 Storage: Edit" to the token, OR create bucket `dolist-snapshots` in the dashboard (preCommands then skip create — but `r2 bucket info` still needs R2 read; token needs at least R2 read either way, and deploy binding needs it too).
 - ENROLLMENT_CODE: GH secret set; local copy in .env.local as DOLIST_ENROLLMENT_CODE. Uploaded by the deploy step.
 - RESOLVED same day: backups moved from R2 into the Sync DO's SQLite (chunked, keep 30), R2 binding dropped, so the deploy no longer needs R2 permission. Revisit R2 only if off-DO copies are wanted.
+
+## 2026-11-25 Accounts (passkey + email link)
+- Open sign-up; app stays usable without an account (local-first). Decision: not gating the app behind login.
+- Email needs Cloudflare Email Service: onboard gratis.sh (dashboard → Compute → Email Service → Email Sending → Onboard Domain). Sending to arbitrary inboxes needs Workers Paid. Until then email links 503; passkeys work.
+- ENROLLMENT_CODE GH secret + DOLIST_ENROLLMENT_CODE in .env.local are now unused (safe to delete).
+- Email link also carries a code: an installed iOS PWA can't receive links (they open Safari).

@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "dependencies": {
     "@dolist/store": "^0.0.0",
+    "@simplewebauthn/server": "^13.3.3",
     "hono": "^4.13.22",
     "tinybase": "^10.1.0"
   }

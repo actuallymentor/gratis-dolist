@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router'
 import styled from 'styled-components'
-import { CalendarDays, CircleCheck, Columns3, Inbox, Search, Settings } from 'lucide-react'
+import { CalendarDays, CircleCheck, Columns3, Inbox, LogIn, Search, Settings } from 'lucide-react'
+import { use_app_store } from '../../stores/app'
 
 const NAV = [
     { to: `/inbox`, label: `Inbox`, Icon: Inbox },
@@ -8,7 +9,8 @@ const NAV = [
     { to: `/horizons`, label: `Horizons`, Icon: Columns3 },
     { to: `/search`, label: `Search`, Icon: Search },
     { to: `/completed`, label: `Completed`, Icon: CircleCheck, desktop_only: true },
-    { to: `/settings`, label: `Settings`, Icon: Settings },
+    { to: `/signin`, label: `Sign in`, Icon: LogIn, desktop_only: true, signed_out_only: true, bottom: true },
+    { to: `/settings`, label: `Settings`, Icon: Settings, bottom: true },
 ]
 
 const Frame = styled.div`
@@ -32,7 +34,8 @@ const Nav = styled.nav`
     }
     a:hover { background: var(--sunk); color: var(--fg) }
     a.active { background: var(--accent-tint); color: var(--fg); font-weight: 600 }
-    a:last-child { margin-top: auto }
+    .bottom ~ .bottom { margin-top: 0 }
+    .bottom { margin-top: auto }
 
     /* Phone: bottom tab bar, thumb reach */
     @media ( max-width: 720px ) {
@@ -45,16 +48,21 @@ const Nav = styled.nav`
         a { flex: 1; flex-direction: column; justify-content: center; gap: .1rem; font-size: .72rem; border-radius: 0; position: relative }
         a.active { background: none }
         a.active::after { content: ""; position: absolute; inset: 0 25% auto; height: 3px; background: var(--accent); border-radius: 0 0 3px 3px }
-        a:last-child { margin-top: 0 }
+        .bottom { margin-top: 0 }
     }
 `
 
 // App frame: sidebar on desktop, bottom tabs on phones
+// Signed out, the sidebar offers Sign in (phones reach it through Settings)
 export default function Shell( { children } ) {
+
+    const signed_in = use_app_store( state => !!state.account?.signed_in )
+    const items = NAV.filter( item => !item.signed_out_only || !signed_in )
+
     return <Frame>
         <Nav aria-label="Main">
             <span className="brand">Dolist</span>
-            { NAV.map( ( { to, label, Icon, desktop_only } ) => <NavLink key={ to } to={ to } className={ desktop_only ? `desktop-only` : undefined }>
+            { items.map( ( { to, label, Icon, desktop_only, bottom } ) => <NavLink key={ to } to={ to } className={ [ desktop_only && `desktop-only`, bottom && `bottom` ].filter( Boolean ).join( ` ` ) || undefined }>
                 <Icon size={ 20 } strokeWidth={ 1.5 } aria-hidden />
                 <span>{ label }</span>
             </NavLink> ) }

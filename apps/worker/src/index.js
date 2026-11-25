@@ -44,48 +44,132 @@ const signed_in = async ( c, next ) => c.get( `session` ) ? next() : c.json( { e
 /**
  * Session state + server time (the client derives its clock offset from `now`).
  */
-app.get( `/api/session`, async c => {
+app.get( `/api/session`, c => {
     const session = c.get( `session` )
     return c.json( {
         now: Date.now(),
         signed_in: !!session,
         session_id: session?.session_id ?? null,
-        enrollable: !session && await auth_of( c ).enrollable(),
+        email: session?.email ?? null,
     } )
 } )
 
-app.post( `/api/login`, async c => {
-    const { code, label } = await c.req.json().catch( () => ( {} ) )
-    const result = await auth_of( c ).login( code, label, c.req.header( `cf-connecting-ip` ) )
-    if( result.error === `throttled` ) return c.json( { error: `Too many attempts, try again in a few minutes` }, 429 )
-    if( result.error ) return c.json( { error: `That code didn't work` }, 401 )
-    setCookie( c, cookie_name( c.req.url ), result.token, cookie_options( c.req.url ) )
-    return c.json( { session_id: result.session_id, recovery_codes: result.recovery_codes ?? null } )
+const source_of = c => c.req.header( `cf-connecting-ip` ) ?? `unknown`
+const body_of = c => c.req.json().catch( () => ( {} ) )
+
+// Sets the session cookie for a successful sign-in
+const signed_in_as = ( c, { token, session_id, created } ) => {
+    setCookie( c, cookie_name( c.req.url ), token, cookie_options( c.req.url ) )
+    return c.json( { session_id, created: !!created } )
+}
+
+const ERRORS = {
+    throttled: [ `Too many attempts, try again in a few minutes`, 429 ],
+    bad_email: [ `That doesn't look like an email address`, 400 ],
+    invalid: [ `That link or code didn't work. It may have expired or been used already.`, 401 ],
+    unknown_passkey: [ `This passkey isn't linked to an account any more. Sign in with email instead.`, 401 ],
+    email_taken: [ `Another account already uses that email`, 409 ],
+    wrong_account: [ `Open that link on a device signed in to the account that asked for it, or type the code there`, 403 ],
+    last_sign_in: [ `This is your only way to sign in. Add an email or another passkey first.`, 409 ],
+    not_found: [ `Not found`, 404 ],
+}
+const failed = ( c, error ) => {
+    const [ message, status ] = ERRORS[ error ] ?? ERRORS.invalid
+    return c.json( { error: message }, status )
+}
+
+/**
+ * Mails a sign-in link + code. Under E2E nothing is sent (the Auth DO keeps an outbox instead).
+ */
+const send_link = async ( env, { email, link, code }, adding ) => {
+    if( env.E2E ) return
+    const intro = adding ? `Confirm this email for your Dolist account.` : `Sign in to Dolist (this also creates your account if you're new).`
+    await env.EMAIL.send( {
+        to: email,
+        from: { email: env.EMAIL_FROM, name: `Dolist` },
+        subject: adding ? `Confirm your email for Dolist` : `Sign in to Dolist`,
+        text: `${ intro }\n\nOpen this link:\n${ link }\n\nOr type this code in the app: ${ code }\n\nIt works once, for 15 minutes. Didn't ask for this? Ignore this email.`,
+        html: `<p>${ intro }</p><p><a href="${ link }">Sign in to Dolist</a></p><p>Or type this code in the app: <strong style="font-family:monospace;font-size:1.2em">${ code }</strong></p><p style="color:#666">It works once, for 15 minutes. Didn't ask for this? Ignore this email.</p>`,
+    } )
+}
+
+// Email link: signs in or creates the account. While signed in, it adds the email to this account instead
+app.post( `/api/email-link`, async c => {
+    const { email } = await body_of( c )
+    const session = c.get( `session` )
+    const result = await auth_of( c ).email_link( email, source_of( c ), session?.owner_id ?? null )
+    if( result.error ) return failed( c, result.error )
+    try {
+        await send_link( c.env, result, !!session )
+    } catch ( error ) {
+        console.error( `email:`, error?.code, error?.message )
+        return c.json( { error: `Couldn't send the email right now. Try a passkey, or try again later.` }, 503 )
+    }
+    return c.json( { sent_to: result.email } )
+} )
+
+app.post( `/api/login/email`, async c => {
+    const { token, email, code, label } = await body_of( c )
+    const session = c.get( `session` )
+    const result = await auth_of( c ).email_login( { token, email, code }, label, source_of( c ), session?.owner_id ?? null )
+    if( result.error ) return failed( c, result.error )
+    if( result.added ) return c.json( { added: true } )
+    return signed_in_as( c, result )
+} )
+
+// Passkeys: create one (signed in: add to this account; signed out: a new account), sign in with one
+app.post( `/api/passkey/register/options`, async c => c.json( await auth_of( c ).passkey_registration( c.get( `session` )?.owner_id ?? null ) ) )
+
+app.post( `/api/passkey/register`, async c => {
+    const { response, label } = await body_of( c )
+    const session = c.get( `session` )
+    const result = await auth_of( c ).passkey_register( response, session?.owner_id ?? null, label, source_of( c ) )
+    if( result.error ) return failed( c, result.error )
+    return result.token ? signed_in_as( c, result ) : c.json( { ok: true } )
+} )
+
+app.post( `/api/passkey/login/options`, async c => c.json( await auth_of( c ).passkey_options() ) )
+
+app.post( `/api/passkey/login`, async c => {
+    const { response, label } = await body_of( c )
+    const result = await auth_of( c ).passkey_login( response, label, source_of( c ) )
+    if( result.error ) return failed( c, result.error )
+    return signed_in_as( c, result )
+} )
+
+app.get( `/api/passkeys`, signed_in, async c => c.json( await auth_of( c ).passkeys( c.get( `session` ).owner_id ) ) )
+
+app.delete( `/api/passkeys/:id`, signed_in, async c => {
+    const result = await auth_of( c ).remove_passkey( c.get( `session` ).owner_id, c.req.param( `id` ) )
+    return result.error ? failed( c, result.error ) : c.json( result )
 } )
 
 app.post( `/api/logout`, signed_in, async c => {
     const { session_id, owner_id } = c.get( `session` )
     await sync_of( c.env, owner_id ).revoke( session_id )
-    await auth_of( c ).revoke( session_id )
+    await auth_of( c ).revoke( owner_id, session_id )
     deleteCookie( c, cookie_name( c.req.url ), cookie_options( c.req.url ) )
     return c.json( { ok: true } )
 } )
 
-app.post( `/api/pair`, signed_in, async c => c.json( await auth_of( c ).pair() ) )
-
-app.post( `/api/recovery-codes`, signed_in, async c => c.json( { recovery_codes: await auth_of( c ).new_recovery_codes() } ) )
-
-app.get( `/api/devices`, signed_in, async c => c.json( await auth_of( c ).sessions() ) )
+app.get( `/api/devices`, signed_in, async c => c.json( await auth_of( c ).sessions( c.get( `session` ).owner_id ) ) )
 
 // Revoke: fence + close sockets in Sync first, then kill the session. If either step fails, retrying
 // redoes both (each is idempotent), so a half-done revoke never leaves a live socket behind
 app.delete( `/api/devices/:id`, signed_in, async c => {
     const id = c.req.param( `id` )
-    const known = ( await auth_of( c ).sessions() ).some( session => session.id === id )
+    const { owner_id } = c.get( `session` )
+    const known = ( await auth_of( c ).sessions( owner_id ) ).some( session => session.id === id )
     if( !known ) return c.json( { error: `No such device` }, 404 )
-    await sync_of( c.env, c.get( `session` ).owner_id ).revoke( id )
-    await auth_of( c ).revoke( id )
+    await sync_of( c.env, owner_id ).revoke( id )
+    await auth_of( c ).revoke( owner_id, id )
     return c.json( { ok: true } )
+} )
+
+// Local e2e only: the mail a test "received"
+app.get( `/api/e2e/outbox`, async c => {
+    if( !c.env.E2E ) return c.json( { error: `Not found` }, 404 )
+    return c.json( await auth_of( c ).outbox( c.req.query( `email` ) ) )
 } )
 
 app.get( `/api/snapshots`, signed_in, async c => {
@@ -122,10 +206,11 @@ app.all( `/api/*`, c => c.json( { error: `Not found` }, 404 ) )
 export default {
     fetch: app.fetch,
 
-    // Nightly backup of every owner (one per deployment, plus e2e tenants never exist in prod)
+    // Nightly backup of every account (e2e tenants never exist in prod)
     async scheduled( event, env ) {
         const auth = env.AUTH.get( env.AUTH.idFromName( `auth:default` ) )
-        const owner_id = await auth.owner()
-        if( owner_id ) await sync_of( env, owner_id ).take_snapshot()
+        for( const user_id of await auth.user_ids() ) {
+            await sync_of( env, user_id ).take_snapshot().catch( error => console.error( `backup ${ user_id }:`, error?.message ) )
+        }
     },
 }

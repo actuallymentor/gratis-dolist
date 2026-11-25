@@ -15,3 +15,4 @@
 - 2026-11-25: M2 started autonomously (yolo, after repeated stall checks). Auth in Auth DO (not D1), Sync DO hub mode, R2 nightly snapshots. Design review (5/5 REVISE) → revocation fence, per-IP throttle, no tab leader, persisted clock offset.
 - 2026-11-25: M3 (PWA capture) started autonomously after another stall check: /capture start URL, shortcuts, share target, accessory row, iOS how-to in Settings.
 - 2026-11-25: CF token lacks R2 → backups now stored in Sync DO SQLite; ENROLLMENT_CODE uploaded by the deploy step from the GH secret.
+- 2026-11-25: User asked for login + registration (passkey + email link). Replaced single-owner codes (enrollment/pairing/recovery) with multi-user accounts; `/signin` page; email via Cloudflare Email Service binding; ENROLLMENT_CODE no longer used.

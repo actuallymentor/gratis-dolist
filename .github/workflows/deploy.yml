@@ -74,8 +74,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: npm
-          # First-device enrollment code (closes after the owner's first sign-in)
-          secrets: ENROLLMENT_CODE
           command: deploy
-        env:
-          ENROLLMENT_CODE: ${{ secrets.ENROLLMENT_CODE }}
