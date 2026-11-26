@@ -2,7 +2,7 @@
 // independently gets its own cell or row. No null cells: absent cell = empty.
 //
 // tasks        id → title, notes, project_id (absent = Inbox), parent_id, priority, scheduled, time, tz,
-//                   duration, deadline, recur (JSON), created_at, completed_at, deleted_at, literal_mask, todoist_id
+//                   duration, deadline, deadline_time, recur (JSON), created_at, completed_at, deleted_at, literal_mask, todoist_id
 // task_labels  `task:label` → on (false = removed, keeps merge history)
 // completions  `task:occurrence` → at, skipped
 // projects     id → name, color, parent_id, created_at, deleted_at, todoist_id

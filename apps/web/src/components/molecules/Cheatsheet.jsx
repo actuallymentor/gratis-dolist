@@ -3,7 +3,7 @@ import styled from 'styled-components'
 
 const ROWS = [
     [ `fri`, `Scheduled date: today, tom(orrow), mon…sun, 12 nov, in 3 days, next week` ],
-    [ `by fri`, `Deadline (inclusive). before fri = the day before` ],
+    [ `by fri`, `Deadline (inclusive). before fri = the day before. by tom 16 = with a time` ],
     [ `at 3pm`, `Time: at 18, at 09:30, at 1500, at 5 (= 17:00)` ],
     [ `every week`, `Repeats from the scheduled date. every! = from completion` ],
     [ `!1 … !4`, `Priority (p1 … p4 also work)` ],
@@ -12,8 +12,16 @@ const ROWS = [
     [ `"by the sea"`, `Quoted text stays in the title` ],
 ]
 
+// Search reads the same shorthand as a query
+const SEARCH = [
+    [ `#work by fri`, `In Work (or a subproject), deadline by Friday` ],
+    [ `tomorrow p2`, `Scheduled or due tomorrow, priority 2` ],
+    [ `@call p1 p2`, `Labelled call, priority 1 or 2` ],
+    [ `next week`, `Anything dated next week` ],
+]
+
 const KEYS = [
-    [ `n`, `New task, from anywhere` ],
+    [ `n`, `Add task, from anywhere` ],
     [ `j / k`, `Next / previous task` ],
     [ `Enter`, `Open selected task` ],
     [ `e`, `Complete selected task` ],
@@ -55,6 +63,8 @@ export default function Cheatsheet() {
         <div role="dialog" aria-label="Cheatsheet" onClick={ event => event.stopPropagation() }>
             <h2>Quick add</h2>
             <dl>{ ROWS.map( ( [ term, text ] ) => [ <dt key={ term }>{ term }</dt>, <dd key={ `${ term }-d` }>{ text }</dd> ] ) }</dl>
+            <h3>Search</h3>
+            <dl>{ SEARCH.map( ( [ term, text ] ) => [ <dt key={ term }>{ term }</dt>, <dd key={ `${ term }-d` }>{ text }</dd> ] ) }</dl>
             <h3>Keys</h3>
             <dl>{ KEYS.map( ( [ term, text ] ) => [ <dt key={ term }>{ term }</dt>, <dd key={ `${ term }-d` }>{ text }</dd> ] ) }</dl>
         </div>

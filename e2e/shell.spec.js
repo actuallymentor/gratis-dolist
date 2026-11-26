@@ -1,13 +1,18 @@
 import { expect, test } from '@playwright/test'
 
-test( `opens on Today and navigates every section`, async ( { page } ) => {
+test( `opens on Horizons and navigates every section; old links redirect`, async ( { page } ) => {
 
     await page.goto( `/` )
-    await expect( page ).toHaveURL( /\/today$/ )
-    await expect( page.getByRole( `heading`, { name: `Today` } ) ).toBeVisible()
+    await expect( page ).toHaveURL( /\/horizons$/ )
+    await expect( page.getByRole( `heading`, { name: `Horizons` } ) ).toBeVisible()
+    await page.goto( `/horizons` )
+    await expect( page ).toHaveURL( /\/horizons$/ )
+    await page.goto( `/inbox` )
+    await expect( page ).toHaveURL( /\/triage$/ )
 
     const nav = page.getByRole( `navigation`, { name: `Main` } )
-    for( const [ link, heading ] of [ [ `Inbox`, `Inbox` ], [ `Horizons`, `Horizons` ], [ `Settings`, `Settings` ] ] ) {
+    await expect( nav.getByRole( `link`, { name: `Today` } ) ).toHaveCount( 0 )
+    for( const [ link, heading ] of [ [ `Triage`, `Triage` ], [ `Horizons`, `Horizons` ], [ `Projects`, `Projects` ], [ `Settings`, `Settings` ] ] ) {
         await nav.getByRole( `link`, { name: link } ).click()
         await expect( page.getByRole( `heading`, { name: heading, level: 1 } ) ).toBeVisible()
     }
@@ -22,9 +27,9 @@ test( `Horizons shows the four rolling lanes plus Someday`, async ( { page } ) =
 } )
 
 test( `deep links survive a reload (SPA fallback)`, async ( { page } ) => {
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await page.reload()
-    await expect( page.getByRole( `heading`, { name: `Inbox` } ) ).toBeVisible()
+    await expect( page.getByRole( `heading`, { name: `Triage` } ) ).toBeVisible()
 } )
 
 test( `theme choice applies and persists; build hash shows`, async ( { page } ) => {
@@ -41,7 +46,7 @@ test( `theme choice applies and persists; build hash shows`, async ( { page } ) 
 
 test( `works offline after first visit`, async ( { page, context } ) => {
 
-    await page.goto( `/today` )
+    await page.goto( `/horizons` )
     await page.evaluate( () => navigator.serviceWorker.ready )
 
     // Reload once so the service worker controls the page, then cut the network
@@ -64,14 +69,14 @@ test( `"Update app" offline keeps the working app`, async ( { page, context } ) 
     await expect( page.getByRole( `status` ).filter( { hasText: `Try again once` } ) ).toBeVisible()
 
     // Cached shell still loads
-    await page.goto( `/today` )
-    await expect( page.getByRole( `heading`, { name: `Today` } ) ).toBeVisible()
+    await page.goto( `/triage` )
+    await expect( page.getByRole( `heading`, { name: `Triage` } ) ).toBeVisible()
     await context.setOffline( false )
 
 } )
 
 test( `install pill never covers navigation`, async ( { page } ) => {
-    await page.goto( `/today` )
+    await page.goto( `/horizons` )
     const settings = page.getByRole( `navigation`, { name: `Main` } ).getByRole( `link`, { name: `Settings` } )
     await settings.click( { trial: true } )
 } )

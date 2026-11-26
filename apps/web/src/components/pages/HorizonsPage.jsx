@@ -73,7 +73,7 @@ export default function HorizonsPage() {
 
     const { project_id } = useParams()
     const { project, ids } = use_project_scope( project_id )
-    const scoped = useMemo( () => open_tasks( tasks ).filter( task => !ids || ids.has( task.project_id ) ), [ tasks, ids ] )
+    const scoped = useMemo( () => project_id && !ids ? [] : open_tasks( tasks ).filter( task => !ids || ids.has( task.project_id ) ), [ tasks, ids, project_id ] ) // gone project = empty board, never everything
 
     const { lanes, outside } = useMemo( () => distribute( scoped, recipe, ctx ), [ scoped, recipe, ctx ] )
     const board = useMemo( () => [ ...lanes, { ...SOMEDAY, tasks: outside } ], [ lanes, outside ] )

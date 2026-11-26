@@ -55,7 +55,7 @@ const Footer = styled.p`
 
 /**
  * Capture-first screen: the installed app's start URL, its "Add task" shortcut and its share target.
- * One focused line with the accessory row, a quiet list of what just landed in the Inbox, and,
+ * One focused line with the accessory row, a quiet list of what just landed, and,
  * for content shared from another app, a separate card (never mixed into the draft, never parsed as grammar).
  */
 export default function CapturePage() {
@@ -126,7 +126,7 @@ export default function CapturePage() {
             <input value={ share.title } onChange={ ( { target: { value } } ) => set_share( { ...share, title: value } ) } aria-label="Shared task title" />
             { share.notes && <p className="notes" aria-label="Shared notes">{ share.notes }</p> }
             <div className="actions">
-                <button type="submit" disabled={ saving }>Add to Inbox</button>
+                <button type="submit" disabled={ saving }>Add shared task</button>
                 <button type="button" onClick={ clear_share }>Discard</button>
             </div>
         </Shared> }
@@ -134,6 +134,6 @@ export default function CapturePage() {
         { !!added.length && <Added aria-label="Just added">
             { added.map( ( title, index ) => <li key={ `${ index }-${ title }` }><Check size={ 16 } strokeWidth={ 1.5 } aria-hidden /> { title }</li> ) }
         </Added> }
-        <Footer>Everything lands in your <Link to="/inbox">Inbox</Link>.</Footer>
+        <Footer>Everything lands in <Link to="/triage">Triage</Link>.</Footer>
     </Page>
 }

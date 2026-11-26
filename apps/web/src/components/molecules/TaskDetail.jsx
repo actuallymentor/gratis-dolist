@@ -34,6 +34,8 @@ const Panel = styled( Modal )`
         width: 100%; min-height: 40px; padding: 0 .6rem; border-radius: var(--radius-sm);
         border: 1px solid var(--line-soft); background: var(--page);
     }
+    dd.pair { display: grid; grid-template-columns: 1fr 8rem; gap: .4rem }
+    dd.pair input:disabled { opacity: .5 }
     .unparsed { color: var(--bad); font-size: .82rem }
 
     h3 { font: 600 .9rem var(--font-body); color: var(--muted); margin-top: .5rem }
@@ -79,7 +81,7 @@ const shorthand_patch = ( task, { task: parsed, spans } ) => {
         literal_mask: parsed.literal_mask ?? null,
         ...( has( `date` ) || has( `recur` ) || has( `time` ) && !task.scheduled ) && { scheduled: parsed.scheduled },
         ...has( `time` ) && { time: parsed.time },
-        ...has( `deadline` ) && { deadline: parsed.deadline },
+        ...has( `deadline` ) && { deadline: parsed.deadline, deadline_time: parsed.deadline_time },
         ...has( `priority` ) && { priority: parsed.priority },
         ...has( `recur` ) && { recur: parsed.recur },
         ...has( `project` ) && { project_id: parsed.project_id ?? null },
@@ -268,7 +270,10 @@ export default function TaskDetail( { task, on_close } ) {
             <dd><input id="d-time" type="time" value={ task.time || `` } onChange={ ( { target: { value } } ) => save( { time: value || null } ) } /></dd>
 
             <dt><label htmlFor="d-deadline">Deadline</label></dt>
-            <dd><input id="d-deadline" type="date" value={ task.deadline || `` } onChange={ ( { target: { value } } ) => save( { deadline: value || null } ) } /></dd>
+            <dd className="pair">
+                <input id="d-deadline" type="date" value={ task.deadline || `` } onChange={ ( { target: { value } } ) => save( { deadline: value || null, ...!value && { deadline_time: null } } ) } />
+                <input type="time" aria-label="Deadline time" disabled={ !task.deadline } value={ task.deadline_time || `` } onChange={ ( { target: { value } } ) => save( { deadline_time: value || null } ) } />
+            </dd>
 
             <dt><label htmlFor="d-priority">Priority</label></dt>
             <dd><select id="d-priority" value={ task.priority || `` } onChange={ ( { target: { value } } ) => save( { priority: value ? Number( value ) : null } ) }>

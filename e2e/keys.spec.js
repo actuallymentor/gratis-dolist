@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
+import { add } from './ui.js'
 
 // Keyboard-first flows + shorthand in edited titles. Fresh context per test (empty IndexedDB).
 
-const quick_add = page => page.getByRole( `textbox`, { name: `New task` } )
 const modal = page => page.getByRole( `dialog`, { name: `New task` } )
 const card = ( page, title ) => page.locator( `[data-task-id]`, { has: page.getByRole( `button`, { name: title, exact: true } ) } )
 
@@ -44,7 +44,7 @@ test.describe( `keyboard`, () => {
 
     test( `n highlights shorthand and strips it on save`, async ( { page } ) => {
 
-        await page.goto( `/inbox` )
+        await page.goto( `/triage` )
         await page.locator( `body` ).click( { position: { x: 1, y: 1 } } )
         await page.keyboard.press( `n` )
         await modal( page ).getByRole( `textbox`, { name: `New task` } ).fill( `Call mum tom at 5` )
@@ -60,7 +60,7 @@ test.describe( `keyboard`, () => {
 
     test( `j / k select, Enter opens a centered modal, e completes`, async ( { page } ) => {
 
-        await page.goto( `/inbox` )
+        await page.goto( `/triage` )
         for( const title of [ `First`, `Second`, `Third` ] ) await add_with_n( page, title )
         const titles = page.locator( `main [data-task-id] .title, [data-task-id] .title` )
         await expect( titles ).toHaveText( [ `First`, `Second`, `Third` ] )
@@ -106,9 +106,8 @@ test.describe( `keyboard`, () => {
 
 test( `editing a title parses its shorthand and strips it`, async ( { page } ) => {
 
-    await page.goto( `/inbox` )
-    await quick_add( page ).fill( `Gym` )
-    await quick_add( page ).press( `Enter` )
+    await page.goto( `/triage` )
+    await add( page, `Gym` )
     await page.getByRole( `button`, { name: `Gym`, exact: true } ).click()
 
     const detail = page.getByRole( `dialog`, { name: /Task: Gym/ } )
@@ -118,7 +117,7 @@ test( `editing a title parses its shorthand and strips it`, async ( { page } ) =
     await title.press( `Enter` )
 
     await expect( title ).toHaveValue( `Gym` )
-    await expect( detail.getByLabel( `Time` ) ).toHaveValue( `09:00` )
+    await expect( detail.getByLabel( `Time`, { exact: true } ) ).toHaveValue( `09:00` )
     await expect( detail.getByLabel( `Priority` ) ).toHaveValue( `2` )
     await expect( detail.getByLabel( `Repeats` ) ).toHaveValue( /mon/ )
     const scheduled = await detail.getByLabel( `Scheduled` ).inputValue()
@@ -128,14 +127,13 @@ test( `editing a title parses its shorthand and strips it`, async ( { page } ) =
     await title.fill( `Gym at 5 #Nowhere` )
     await title.press( `Enter` )
     await expect( title ).toHaveValue( `Gym #Nowhere` )
-    await expect( detail.getByLabel( `Time` ) ).toHaveValue( `17:00` )
+    await expect( detail.getByLabel( `Time`, { exact: true } ) ).toHaveValue( `17:00` )
 } )
 
 test( `quoted text stays protected through later title edits`, async ( { page } ) => {
 
-    await page.goto( `/inbox` )
-    await quick_add( page ).fill( `Read "by friday" book` )
-    await quick_add( page ).press( `Enter` )
+    await page.goto( `/triage` )
+    await add( page, `Read "by friday" book` )
     await page.getByRole( `button`, { name: `Read by friday book`, exact: true } ).click()
 
     const detail = page.getByRole( `dialog`, { name: /Task: Read by friday book/ } )
@@ -144,5 +142,5 @@ test( `quoted text stays protected through later title edits`, async ( { page } 
     await expect( detail.locator( `mark` ) ).toHaveCount( 0 )
     await title.press( `Enter` )
     await expect( title ).toHaveValue( `Read by friday book again` )
-    await expect( detail.getByLabel( `Deadline` ) ).toHaveValue( `` )
+    await expect( detail.getByLabel( `Deadline`, { exact: true } ) ).toHaveValue( `` )
 } )

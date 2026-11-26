@@ -39,7 +39,7 @@ const Card = styled.article`
  */
 function TaskCard( { task, today, done, leaving, draggable, on_complete, on_open, on_move, on_drag_start } ) {
 
-    const { title, priority, scheduled, deadline, time, labels = [], project, recur } = task
+    const { title, priority, scheduled, deadline, deadline_time, time, labels = [], project, recur } = task
     const late = scheduled && scheduled < today
 
     return <Card data-leaving={ leaving || undefined } draggable={ draggable || undefined } onDragStart={ on_drag_start } data-task-id={ task.id }>
@@ -49,7 +49,7 @@ function TaskCard( { task, today, done, leaving, draggable, on_complete, on_open
         <div className="meta">
             { scheduled && <span className={ late ? `late` : undefined }><CalendarDays size={ 12 } aria-hidden />{ resolve_date_label( scheduled, today ) }</span> }
             { time && <span><Clock size={ 12 } aria-hidden />{ time }</span> }
-            { deadline && <span className="deadline" title="Deadline"><Flag size={ 12 } aria-hidden />{ resolve_date_label( deadline, today ) }</span> }
+            { deadline && <span className="deadline" title="Deadline"><Flag size={ 12 } aria-hidden />{ resolve_date_label( deadline, today ) }{ deadline_time && ` ${ deadline_time }` }</span> }
             { recur && <span title="Repeats"><Repeat size={ 12 } aria-label="Repeats" /></span> }
             { project && <span><Hash size={ 12 } aria-hidden />{ project }</span> }
             { labels.map( label => <span key={ label }><Tag size={ 12 } aria-hidden />{ label }</span> ) }

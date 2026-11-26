@@ -53,6 +53,16 @@ describe( `dates (§2.4 contract table)`, () => {
         expect( task_of( `Report by 1 dec` ).deadline ).toBe( `2026-12-01` )
     } )
 
+    it( `a time after the deadline date is the deadline's time`, () => {
+        expect( task_of( `Report by tom 16` ) ).toMatchObject( { title: `Report`, deadline: `2026-11-25`, deadline_time: `16:00`, time: null, scheduled: null } )
+        expect( task_of( `Report by fri at 5pm` ) ).toMatchObject( { deadline: `2026-11-27`, deadline_time: `17:00` } )
+        expect( task_of( `Report by tom 1500 #Errands` ) ).toMatchObject( { deadline_time: `15:00`, project: `Errands` } )
+        expect( task_of( `Report by tom 5` ).deadline_time ).toBe( `17:00` )
+        expect( task_of( `Report before fri 9:30` ) ).toMatchObject( { deadline: `2026-11-26`, deadline_time: `09:30` } )
+        expect( task_of( `Buy by fri 3 apples` ) ).toMatchObject( { title: `Buy 3 apples`, deadline: `2026-11-27`, deadline_time: null } )
+        expect( task_of( `Report by 1 dec` ).deadline_time ).toBeNull()
+    } )
+
     it( `past time today → tomorrow, future time → today`, () => {
         expect( task_of( `Call at 3pm`, { now: `16:00` } ) ).toMatchObject( { scheduled: `2026-11-25`, time: `15:00`, title: `Call` } )
         expect( task_of( `Call at 3pm`, { now: `10:00` } ).scheduled ).toBe( today )
@@ -137,6 +147,8 @@ describe( `priority, projects, labels, fields`, () => {
         expect( of( `x #Home/Clients` ) ).toMatchObject( { project: `Clients`, project_id: `hc` } )
         expect( of( `x #Work/Clients` ).project_id ).toBe( `wc` )
         expect( of( `x #Work/Nope` ).project_id ).toBeUndefined()
+        expect( of( `x #Work #Home/Nope` ) ).toMatchObject( { project: `Work`, project_id: `w` } ) // unknown later token isn't folded
+        expect( of( `x #Work #Home` ).project_id ).toBe( `h` )
     } )
 
     it( `unknown #project / @label → unknown span, removed from title`, () => {

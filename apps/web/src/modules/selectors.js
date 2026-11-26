@@ -1,5 +1,3 @@
-import { horizon_of } from '@dolist/core'
-
 // Open = not completed, not deleted, top-level (subtasks live in their parent's detail)
 const is_open = ( { completed_at, deleted_at, parent_id } ) => !completed_at && !deleted_at && !parent_id
 
@@ -8,10 +6,16 @@ const by_soonest = ( a, b ) => {
     return soonest( a ).localeCompare( soonest( b ) ) || ( a.priority || 5 ) - ( b.priority || 5 ) || ( a.created_at || 0 ) - ( b.created_at || 0 )
 }
 
-export const inbox_tasks = tasks => tasks.filter( task => is_open( task ) && !task.project_id ).sort( by_soonest )
-
-export const today_tasks = ( tasks, today ) => tasks
-    .filter( task => is_open( task ) && [ `overdue`, `today` ].includes( horizon_of( task, today ) ) )
+/**
+ * Triage: open tasks, minus the kinds switched off. Each flag = "include tasks that have this"
+ * @param {object[]} tasks
+ * @param {{ date: boolean, deadline: boolean, project: boolean }} include
+ */
+export const triage_tasks = ( tasks, include ) => tasks
+    .filter( task => is_open( task )
+        && ( include.date || !task.scheduled )
+        && ( include.deadline || !task.deadline )
+        && ( include.project || !task.project_id ) )
     .sort( by_soonest )
 
 export const open_tasks = tasks => tasks.filter( is_open )

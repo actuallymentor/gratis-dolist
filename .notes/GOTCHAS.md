@@ -47,3 +47,5 @@
 - e2e runs against wrangler dev serving apps/web/dist: `npm run build` before e2e or you test stale UI
 - Draft slot names must not contain `:` (drafts key is `name:tab`; orphan adoption would misattribute). Project drafts use `project-<id>`.
 - Shell reads the store (project tree): StoreProvider must wrap Shell, routes still gated on `ready`.
+- e2e: add tasks via `e2e/ui.js` `add()` (sidebar Add task → modal, waits on the `quick-add-modal` draft clearing). Triage hides dated tasks by default — check dated tasks on Horizons/Search. `getByLabel('Deadline'|'Time')` needs exact (Deadline time input).
+- Grammar date sources contain capture groups: use named groups when adding groups to a rule regex.

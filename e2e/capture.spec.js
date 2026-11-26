@@ -10,7 +10,7 @@ test( `the manifest launches into capture, with a shortcut and a share target`, 
     expect( manifest.shortcuts.map( ( { url } ) => url ) ).toContain( `/capture` )
 } )
 
-test( `capture opens focused, adds to the Inbox, lists what was added`, async ( { page } ) => {
+test( `capture opens focused, adds to Triage, lists what was added`, async ( { page } ) => {
     const started = Date.now()
     await page.goto( `/capture` )
     await expect( quick_add( page ) ).toBeFocused()
@@ -19,7 +19,7 @@ test( `capture opens focused, adds to the Inbox, lists what was added`, async ( 
     await quick_add( page ).fill( `Buy stamps` )
     await quick_add( page ).press( `Enter` )
     await expect( page.getByLabel( `Just added` ) ).toContainText( `Buy stamps` )
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await expect( page.getByRole( `button`, { name: `Buy stamps` } ) ).toBeVisible()
 } )
 
@@ -32,20 +32,20 @@ test( `a share is its own literal task, kept until added, never mixed into the d
     await expect( card.getByLabel( `Shared task title` ) ).toHaveValue( `Read #home tomorrow !1` )
     await expect( quick_add( page ) ).toHaveValue( `Buy milk tomorrow` )
 
-    // Edits survive a reload, and leaving for the Inbox and coming back keeps the card
+    // Edits survive a reload, and leaving for Triage and coming back keeps the card
     await card.getByLabel( `Shared task title` ).fill( `Read later #home tomorrow !1` )
     await page.reload()
-    await page.getByRole( `link`, { name: `Inbox` } ).first().click()
+    await page.getByRole( `link`, { name: `Triage` } ).first().click()
     await page.goto( `/capture` )
     await expect( card.getByLabel( `Shared task title` ) ).toHaveValue( `Read later #home tomorrow !1` )
-    await card.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await card.getByRole( `button`, { name: `Add shared task` } ).click()
     await expect( page.getByLabel( `Just added` ) ).toContainText( `Read later #home tomorrow !1` )
     await expect( card ).toHaveCount( 0 )
     await page.reload()
     await expect( card ).toHaveCount( 0 )
     await expect( quick_add( page ) ).toHaveValue( `Buy milk tomorrow` )
 
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await page.getByRole( `button`, { name: `Read later #home tomorrow !1` } ).click()
     await expect( page.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `https://example.com/a` )
     await expect( page.getByRole( `dialog` ).getByLabel( `Scheduled` ) ).toHaveValue( `` )
@@ -66,7 +66,7 @@ test( `accessory row inserts tokens without losing focus`, async ( { page } ) =>
 
 test( `iOS shows Add to Home Screen in Settings, never a floating pill`, async ( { page }, { project } ) => {
     test.skip( project.name !== `iphone`, `iOS only` )
-    await page.goto( `/today` )
+    await page.goto( `/horizons` )
     await expect( page.getByRole( `button`, { name: `Install app` } ) ).toHaveCount( 0 )
     await page.goto( `/settings` )
     await expect( page.getByLabel( `Install on iPhone` ) ).toContainText( `Add to Home Screen` )
@@ -75,24 +75,24 @@ test( `iOS shows Add to Home Screen in Settings, never a floating pill`, async (
 test( `the same share added twice (history, second tab) is still one task`, async ( { page, context } ) => {
     const url = `/capture?title=${ encodeURIComponent( `Only once please` ) }`
     await page.goto( url )
-    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await page.getByRole( `button`, { name: `Add shared task` } ).click()
     await expect( page.getByLabel( `Just added` ) ).toContainText( `Only once please` )
 
     // Edit it, then back through history and in another tab: still one task, edits kept
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await page.getByRole( `button`, { name: `Only once please` } ).click()
     await page.getByRole( `dialog` ).getByLabel( `Notes` ).fill( `my research` )
     await page.keyboard.press( `Escape` )
     await expect( page.getByRole( `dialog` ) ).toHaveCount( 0 )
     await page.waitForTimeout( 300 )
     await page.goto( url )
-    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await page.getByRole( `button`, { name: `Add shared task` } ).click()
     const other = await context.newPage()
     await other.goto( url )
-    await other.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await other.getByRole( `button`, { name: `Add shared task` } ).click()
     await expect( other.getByLabel( `Just added` ) ).toBeVisible()
 
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await expect( page.getByRole( `button`, { name: `Only once please` } ) ).toHaveCount( 1 )
     await page.getByRole( `button`, { name: `Only once please` } ).click()
     await expect( page.getByRole( `dialog` ).getByLabel( `Notes` ) ).toHaveValue( `my research` )
@@ -101,18 +101,18 @@ test( `the same share added twice (history, second tab) is still one task`, asyn
 test( `a deleted share comes back when shared again`, async ( { page } ) => {
     const url = `/capture?title=${ encodeURIComponent( `Bring me back` ) }`
     await page.goto( url )
-    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await page.getByRole( `button`, { name: `Add shared task` } ).click()
     await expect( page.getByLabel( `Just added` ) ).toContainText( `Bring me back` )
 
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await page.getByRole( `button`, { name: `Bring me back` } ).click()
     await page.getByRole( `button`, { name: `Delete task` } ).click()
     await expect( page.getByRole( `button`, { name: `Bring me back` } ) ).toHaveCount( 0 )
     await page.waitForTimeout( 300 )
 
     await page.goto( url )
-    await page.getByRole( `button`, { name: `Add to Inbox` } ).click()
+    await page.getByRole( `button`, { name: `Add shared task` } ).click()
     await expect( page.getByText( `Brought back from deleted` ) ).toBeVisible()
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await expect( page.getByRole( `button`, { name: `Bring me back` } ) ).toHaveCount( 1 )
 } )

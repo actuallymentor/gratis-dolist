@@ -2,7 +2,7 @@
 //
 //   dates      today · tomorrow · tom · fri · next fri · next week · in 3 days · 12 nov · nov 12th · 2026-12-01
 //              (numeric 12/11 is deliberately NOT a date: day/month order is ambiguous and titles hold fractions)
-//   deadline   by fri (inclusive) · before fri (the day before)
+//   deadline   by fri (inclusive) · before fri (the day before) · by tom 16 / by fri at 5pm (deadline time)
 //   time       at 3pm · at 15:00 · 3:30pm · at noon · at 18 · at 09 · at 1500 · at 5 (bare 1–6 = afternoon)
 //   recurrence every day|weekday|mon|2 weeks|month on 31|year|1st sat|28 nov · every! 3 days (from completion)
 //   priority   !1–!4 or p1–p4, whole token only (`!!!` and `wow!1` stay text)
@@ -196,11 +196,17 @@ const RULES = [
         return recur.unparsed ? null : { value: recur }
     } },
 
-    { type: `deadline`, regex: new RegExp( `${ B }(?:by|before)\\s+(?:${ PREFIXED_DATE_SRC })${ E }`, `gi` ), read: ( match, { today, week_start } ) => {
+    // A time right after the date belongs to the deadline: `by tom 16`, `by fri at 5pm`.
+    // A bare number only counts at the end or before more grammar ("by fri 3 apples" stays text)
+    { type: `deadline`, regex: new RegExp( `${ B }(?:by|before)\\s+(?:${ PREFIXED_DATE_SRC })(?:\\s+(?:at\\s+(?<at_time>${ TIME_SRC })|(?<bare_time>${ TIME_SRC })(?=\\s*(?:$|[,.;!?)#@!]|p[1-4]\\b|every\\b))))?${ E }`, `gi` ), read: ( match, { today, week_start } ) => {
         if( names_tom( match[ 0 ] ) ) return null
-        const date = resolve_date_phrase( match[ 0 ], today, week_start )
+        const [ phrase ] = match
+        const time_text = match.groups?.at_time ?? match.groups?.bare_time
+        const time = time_text && resolve_time_phrase( time_text )
+        if( time_text && !time ) return null
+        const date = resolve_date_phrase( time_text ? phrase.slice( 0, phrase.lastIndexOf( time_text ) ).replace( /\s+at\s*$/i, `` ) : phrase, today, week_start )
         if( !date ) return null
-        return { value: /^before/i.test( match[ 0 ] ) ? add_days( date, -1 ) : date }
+        return { value: /^before/i.test( phrase ) ? add_days( date, -1 ) : date, ...time && { time } }
     } },
 
     // Bare `at 5` is flagged: it only counts at the end or right before other grammar (see drop_loose_hours)
@@ -362,10 +368,11 @@ export const parse_quick_add = ( text = ``, { today, week_start = 1, now, projec
     } )
 
     // Fold spans into the task, in reading order
-    const blank = { title: ``, scheduled: null, deadline: null, time: null, priority: null, project: null, labels: [], recur: null, fields: {} }
-    const folded = flagged.filter( span => !span.unknown && span.type !== `literal` ).reduce( ( task, { type, value, id } ) => {
+    const blank = { title: ``, scheduled: null, deadline: null, deadline_time: null, time: null, priority: null, project: null, labels: [], recur: null, fields: {} }
+    const folded = flagged.filter( span => !span.unknown && span.type !== `literal` ).reduce( ( task, { type, value, id, time } ) => {
         if( type === `date` ) return { ...task, scheduled: value }
-        if( type === `project` ) return { ...task, project: value, ...id && { project_id: id } }
+        if( type === `project` ) return { ...task, project: value, project_id: id ?? null } // last wins, id included
+        if( type === `deadline` ) return { ...task, deadline: value, deadline_time: time ?? null }
         if( type === `label` ) return { ...task, labels: [ ...new Set( [ ...task.labels, value ] ) ] }
         if( type === `field` ) return { ...task, fields: { ...task.fields, [ value.name ]: value.value } }
         return { ...task, [ type ]: value }

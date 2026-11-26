@@ -4,7 +4,6 @@ import { Columns3, FolderTree } from 'lucide-react'
 import { use_tasks } from '@dolist/store/react'
 import Page from '../atoms/Page'
 import EmptyState from '../atoms/EmptyState'
-import QuickAdd from '../molecules/QuickAdd'
 import TaskList from '../molecules/TaskList'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { use_project_scope } from '../../hooks/use_project_scope'
@@ -21,7 +20,7 @@ const Links = styled.nav`
 `
 
 /**
- * One project: its open tasks and its subprojects' (cards name the project), quick add files into it.
+ * One project: its open tasks and its subprojects' (cards name the project); Add task here files into it.
  * Links to its Horizons board and straight to each subproject.
  */
 export default function ProjectPage() {
@@ -42,9 +41,8 @@ export default function ProjectPage() {
             <Link to={ `/horizons/${ project.id }` }><Columns3 size={ 16 } strokeWidth={ 1.5 } aria-hidden />Horizons</Link>
             { children.map( child => <Link key={ child.id } to={ `/projects/${ child.id }` }>#{ child.name }</Link> ) }
         </Links>
-        <QuickAdd key={ project.id } defaults={ { project_id: project.id } } draft={ `project-${ project.id }` } placeholder={ `Add to ${ project.name }…` } />
         <TaskList tasks={ project_tasks( tasks, ids ) } today={ today } on_complete={ on_complete } on_open={ on_open } empty={
-            <EmptyState icon={ FolderTree } title={ `Nothing in ${ project.name }` }>Tasks added here, or with #{ project.name } anywhere, land here.</EmptyState>
+            <EmptyState icon={ FolderTree } title={ `Nothing in ${ project.name }` }>Add a task while you're here, or use #{ project.name } anywhere.</EmptyState>
         }
         />
     </Page>

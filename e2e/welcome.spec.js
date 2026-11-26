@@ -10,14 +10,14 @@ const welcome = page => page.getByRole( `dialog`, { name: `Welcome to Dolist` } 
 
 test( `signed out: shows on load, continue dismisses until the next load`, async ( { page } ) => {
 
-    await page.goto( `/today` )
+    await page.goto( `/horizons` )
     await expect( welcome( page ) ).toBeVisible()
     await page.getByRole( `button`, { name: `Continue without login` } ).click()
     await expect( welcome( page ) ).toHaveCount( 0 )
 
     // In-app navigation keeps it away; the app works locally
-    await page.getByRole( `navigation`, { name: `Main` } ).getByRole( `link`, { name: `Inbox` } ).click()
-    await expect( page.getByRole( `heading`, { name: `Inbox` } ) ).toBeVisible()
+    await page.getByRole( `navigation`, { name: `Main` } ).getByRole( `link`, { name: `Triage` } ).click()
+    await expect( page.getByRole( `heading`, { name: `Triage` } ) ).toBeVisible()
     await expect( welcome( page ) ).toHaveCount( 0 )
 
     // A new page load asks again
@@ -27,7 +27,7 @@ test( `signed out: shows on load, continue dismisses until the next load`, async
 
 test( `the covered app takes no keys`, async ( { page } ) => {
 
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await expect( welcome( page ) ).toBeVisible()
     await page.keyboard.type( `ghosttask` ) // no space: that would press the focused Sign in button
     for( const key of [ `Tab`, `Tab`, `Tab`, `Shift+Tab`, `Shift+Tab`, `Shift+Tab` ] ) {
@@ -36,7 +36,8 @@ test( `the covered app takes no keys`, async ( { page } ) => {
     }
 
     await page.getByRole( `button`, { name: `Continue without login` } ).click()
-    await expect( page.getByRole( `textbox`, { name: `New task` } ) ).toHaveValue( `` )
+    await expect( page.getByRole( `button`, { name: /ghosttask/ } ) ).toHaveCount( 0 )
+    await expect( page.getByRole( `dialog` ) ).toHaveCount( 0 ) // `n` in ghosttask never opened quick add
 } )
 
 test( `a load that starts on capture stays uninterrupted`, async ( { page } ) => {
@@ -44,14 +45,14 @@ test( `a load that starts on capture stays uninterrupted`, async ( { page } ) =>
     await page.goto( `/capture` )
     await expect( page.getByRole( `textbox`, { name: `New task` } ) ).toBeVisible()
     await page.goto( `/capture` )
-    await page.evaluate( () => history.pushState( {}, ``, `/inbox` ) || dispatchEvent( new PopStateEvent( `popstate` ) ) )
-    await expect( page.getByRole( `heading`, { name: `Inbox` } ) ).toBeVisible()
+    await page.evaluate( () => history.pushState( {}, ``, `/triage` ) || dispatchEvent( new PopStateEvent( `popstate` ) ) )
+    await expect( page.getByRole( `heading`, { name: `Triage` } ) ).toBeVisible()
     await expect( welcome( page ) ).toHaveCount( 0 )
 } )
 
 test( `sign in goes to the sign-in page`, async ( { page } ) => {
 
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await page.getByRole( `button`, { name: `Sign in or create account` } ).click()
     await expect( page ).toHaveURL( /\/signin/ )
     await expect( welcome( page ) ).toHaveCount( 0 )
@@ -80,8 +81,8 @@ test( `signed in: never shows, not even as a flash`, async ( { browser } ) => {
             if( document.querySelector( `[aria-label="Welcome to Dolist"]` ) ) window.welcome_seen = true
         } ).observe( document, { childList: true, subtree: true } )
     } )
-    await page.goto( `/today` )
-    await expect( page.getByRole( `heading`, { name: `Today` } ) ).toBeVisible()
+    await page.goto( `/horizons` )
+    await expect( page.getByRole( `heading`, { name: `Horizons` } ) ).toBeVisible()
     await page.waitForTimeout( 1_000 )
     expect( await page.evaluate( () => !!window.welcome_seen ) ).toBe( false )
 

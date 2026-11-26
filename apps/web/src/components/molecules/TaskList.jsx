@@ -12,7 +12,7 @@ const List = styled.div`
     .more:hover, .more:focus-visible { background: var(--sunk); color: var(--fg) }
 `
 
-// Plain vertical list of tasks (Inbox, Today, Search)
+// Plain vertical list of tasks (Triage, projects, Search)
 export default function TaskList( { tasks, today, on_complete, on_open, on_move, empty } ) {
 
     const [ limit, set_limit ] = useState( PAGE )

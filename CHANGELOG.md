@@ -3,6 +3,10 @@
 ## 2026-11-26
 
 ### Added
+- Triage (was Inbox): filter view with Has date / Has deadline / Has project toggles (default: undated), kept in the URL
+- sidebar / tab-bar Add task opens quick add (the only add surface besides `n` and /capture)
+- search reads shorthand: `#work by next week`, `tomorrow p2`, `@sensitive p1 p2 p4`, `next week`
+- deadline times: `by tom 16`, `by fri at 5pm`; shown on cards, editable in the detail
 - nested projects: `#Work/Clients` creates/finds each level; project pages + Projects index
 - sidebar lists every project under Projects (tasks) and Horizons (its own board); phones get a Projects tab
 - `n` on a project page files the task into that project
@@ -10,9 +14,13 @@
 - welcome screen on load when signed out: sign in or continue without login
 
 ### Changed
+- removed the Today view (Horizons' Today lane covers it); app opens on Horizons; /today, /inbox redirect
+- inline add bars removed from list pages
 - Horizons uses the full width; list pages wider (60rem)
 
 ### Fixed
+- board scrolls inside itself instead of widening the page; a missing project's board is empty, not everything
+- a later #project token no longer keeps the earlier project's id
 - primary buttons readable in dark mode
 - welcome screen blocks keys to the app behind it; never appears mid-session
 

@@ -1,14 +1,13 @@
 import { Fragment, useMemo } from 'react'
 import { NavLink } from 'react-router'
 import styled from 'styled-components'
-import { CalendarDays, CircleCheck, Columns3, FolderTree, Inbox, LogIn, Search, Settings } from 'lucide-react'
+import { CircleCheck, Columns3, FolderTree, ListFilter, LogIn, Plus, Search, Settings } from 'lucide-react'
 import { use_projects } from '@dolist/store/react'
 import { use_app_store } from '../../stores/app'
 import { project_tree } from '../../modules/selectors'
 
 const NAV = [
-    { to: `/inbox`, label: `Inbox`, Icon: Inbox },
-    { to: `/today`, label: `Today`, Icon: CalendarDays },
+    { to: `/triage`, label: `Triage`, Icon: ListFilter },
     { to: `/horizons`, label: `Horizons`, Icon: Columns3, tree: true },
     { to: `/projects`, label: `Projects`, Icon: FolderTree, tree: true },
     { to: `/search`, label: `Search`, Icon: Search },
@@ -19,9 +18,9 @@ const NAV = [
 
 const Frame = styled.div`
     min-height: 100dvh;
-    display: grid; grid-template-columns: 14rem 1fr;
+    display: grid; grid-template-columns: 14rem minmax( 0, 1fr ); /* minmax: wide content (the board) scrolls itself, never the page */
 
-    @media ( max-width: 720px ) { grid-template-columns: 1fr }
+    @media ( max-width: 720px ) { grid-template-columns: minmax( 0, 1fr ) }
 `
 
 const Nav = styled.nav`
@@ -31,12 +30,16 @@ const Nav = styled.nav`
 
     .brand { font: 600 1.1rem var(--font-head); padding: 0 .75rem 1rem; letter-spacing: .01em }
 
-    a {
+    a, .add {
         display: flex; align-items: center; gap: .65rem; min-height: 44px; padding: 0 .75rem;
         border-radius: var(--radius-sm); text-decoration: none; color: var(--muted);
         transition: background 160ms var(--ease), color 160ms var(--ease);
     }
-    a:hover { background: var(--sunk); color: var(--fg) }
+    a:hover, .add:hover { background: var(--sunk); color: var(--fg) }
+
+    /* The one way to add (besides n): first in the list, accent so it reads as the action */
+    .add { border: 0; background: none; font: inherit; cursor: pointer; color: var(--accent-strong); font-weight: 600; margin-bottom: .35rem }
+    .add:focus-visible { box-shadow: 0 0 0 5px var(--accent-tint) }
     a.active { background: var(--accent-tint); color: var(--fg); font-weight: 600 }
 
     /* Project trees under Horizons and Projects; indent per level (--depth) */
@@ -54,7 +57,8 @@ const Nav = styled.nav`
 
         overflow: visible;
         .brand, .desktop-only { display: none }
-        a { flex: 1; flex-direction: column; justify-content: center; gap: .1rem; font-size: .72rem; border-radius: 0; position: relative }
+        .add { margin: 0 }
+        a, .add { flex: 1; flex-direction: column; justify-content: center; gap: .1rem; font-size: .72rem; border-radius: 0; position: relative }
         a.active { background: none }
         a.active::after { content: ""; position: absolute; inset: 0 25% auto; height: 3px; background: var(--accent); border-radius: 0 0 3px 3px }
         .bottom { margin-top: 0 }
@@ -67,6 +71,7 @@ const Nav = styled.nav`
 export default function Shell( { children } ) {
 
     const signed_in = use_app_store( state => !!state.account?.signed_in )
+    const open_quick_add = use_app_store( state => state.set_quick_add_open )
     const projects = use_projects()
     const tree = useMemo( () => project_tree( projects ), [ projects ] )
     const items = NAV.filter( item => !item.signed_out_only || !signed_in )
@@ -74,6 +79,10 @@ export default function Shell( { children } ) {
     return <Frame>
         <Nav aria-label="Main">
             <span className="brand">Dolist</span>
+            <button type="button" className="add" onClick={ () => open_quick_add( true ) } aria-label="Add task" aria-keyshortcuts="n" title="Add task (n)">
+                <Plus size={ 20 } strokeWidth={ 1.75 } aria-hidden />
+                <span>Add<span className="desktop-only"> task</span></span>
+            </button>
             { items.map( ( { to, label, Icon, desktop_only, bottom, tree: nested } ) => <Fragment key={ to }>
                 <NavLink to={ to } end={ nested } className={ [ desktop_only && `desktop-only`, bottom && `bottom` ].filter( Boolean ).join( ` ` ) || undefined }>
                     <Icon size={ 20 } strokeWidth={ 1.5 } aria-hidden />

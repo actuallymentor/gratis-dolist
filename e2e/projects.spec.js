@@ -1,20 +1,12 @@
 import { expect, test } from '@playwright/test'
+import { add } from './ui.js'
 
 // Nested projects: created from quick add (#name, #Parent/Child), listed under Projects and Horizons
 
-const quick_add = page => page.getByRole( `textbox`, { name: `New task` } ).first()
-
-// Unknown names need a second Enter (the create offer)
-const add = async ( page, text, { create = false } = {} ) => {
-    await quick_add( page ).fill( text )
-    await quick_add( page ).press( `Enter` )
-    if( create ) await quick_add( page ).press( `Enter` )
-    await expect( quick_add( page ) ).toHaveValue( `` )
-}
 
 test( `#Parent/Child creates nested projects; the project page and its board scope to the subtree`, async ( { page, isMobile } ) => {
 
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await add( page, `Draft proposal #Work/Clients tom`, { create: true } )
     await add( page, `Team lunch #work` )
     await add( page, `Water plants` )
@@ -33,14 +25,14 @@ test( `#Parent/Child creates nested projects; the project page and its board sco
         await expect( nav.getByRole( `link`, { name: `Projects: Work/Clients` } ) ).toBeVisible()
     }
 
-    // Parent page shows its own and its subprojects' tasks, not the Inbox's
+    // Parent page shows its own and its subprojects' tasks, not unfiled ones
     await work.click()
     await expect( page.getByRole( `heading`, { name: `Work`, exact: true } ) ).toBeVisible()
     await expect( page.getByRole( `button`, { name: `Draft proposal`, exact: true } ) ).toBeVisible()
     await expect( page.getByRole( `button`, { name: `Team lunch`, exact: true } ) ).toBeVisible()
     await expect( page.getByRole( `button`, { name: `Water plants`, exact: true } ) ).toHaveCount( 0 )
 
-    // Quick add on a subproject files into it without typing #
+    // Add task on a subproject files into it without typing #
     await page.getByRole( `link`, { name: `#Clients` } ).click()
     await expect( page.getByText( `in Work` ) ).toBeVisible()
     await add( page, `Invoice` )
@@ -57,7 +49,7 @@ test( `#Parent/Child creates nested projects; the project page and its board sco
 
 test( `the task detail lists projects as a tree and title shorthand moves a task into a subproject`, async ( { page } ) => {
 
-    await page.goto( `/inbox` )
+    await page.goto( `/triage` )
     await add( page, `Seed #Home/Garden`, { create: true } )
     await add( page, `Seed #Work/Garden`, { create: true } )
     await add( page, `Rake leaves` )
