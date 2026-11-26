@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import TriagePage from '../components/pages/TriagePage'
 import HorizonsPage from '../components/pages/HorizonsPage'
 import SettingsPage from '../components/pages/SettingsPage'
@@ -9,13 +9,19 @@ import SignInPage from '../components/pages/SignInPage'
 import ProjectsPage from '../components/pages/ProjectsPage'
 import ProjectPage from '../components/pages/ProjectPage'
 
+// Old routes forward with their query (?task= deep links keep opening the task)
+function Moved( { to } ) {
+    const { search } = useLocation()
+    return <Navigate to={ `${ to }${ search }` } replace />
+}
+
 export default function AppRoutes() {
     return <Routes>
         <Route path="/" element={ <Navigate to="/horizons" replace /> } />
         <Route path="/capture" element={ <CapturePage /> } />
         <Route path="/triage" element={ <TriagePage /> } />
-        <Route path="/inbox" element={ <Navigate to="/triage" replace /> } />
-        <Route path="/today" element={ <Navigate to="/horizons" replace /> } />
+        <Route path="/inbox" element={ <Moved to="/triage" /> } />
+        <Route path="/today" element={ <Moved to="/horizons" /> } />
         <Route path="/horizons" element={ <HorizonsPage /> } />
         <Route path="/horizons/:project_id" element={ <HorizonsPage /> } />
         <Route path="/projects" element={ <ProjectsPage /> } />

@@ -13,6 +13,9 @@ const tasks = [
     { id: `d`, title: `Taxes`, labels: [ `sensitive` ], priority: 3, deadline: `2026-12-03` },
     { id: `e`, title: `Fix fence`, project_id: `h`, scheduled: `2026-12-02`, notes: `Bring the drill` },
     { id: `f`, title: `Café visit`, labels: [ `sensitive` ], priority: 4 },
+    { id: `g`, title: `Standup`, scheduled: `2026-11-26`, time: `09:00`, recur: { freq: `week` } },
+    { id: `h`, title: `Form A`, deadline: `2026-11-25`, deadline_time: `15:00` },
+    { id: `i`, title: `Form B`, deadline: `2026-11-25`, deadline_time: `18:00` },
 ]
 
 const find = query => tasks.filter( compile_search( query, { today, projects, labels } ).fn ).map( ( { id } ) => id )
@@ -22,12 +25,21 @@ describe( `compile_search`, () => {
     it( `#project includes subprojects; by <date> = deadline on or before`, () => {
         expect( find( `#work` ) ).toEqual( [ `a`, `b` ] )
         expect( find( `#work by next week` ) ).toEqual( [ `b` ] )
+        expect( find( `by tom 16` ) ).toEqual( [ `h` ] )
+        expect( find( `by tom` ) ).toEqual( [ `h`, `i` ] )
+    } )
+
+    it( `times and repeats are real constraints, not ignored tokens`, () => {
+        expect( find( `at 9` ) ).toEqual( [ `g` ] )
+        expect( find( `every week` ) ).toEqual( [ `g` ] )
     } )
 
     it( `a date matches that day, a week phrase the whole week; priorities combine`, () => {
         expect( find( `tomorrow p2` ) ).toEqual( [ `a` ] )
         expect( find( `tomorrow p1` ) ).toEqual( [] )
         expect( find( `next week` ) ).toEqual( [ `b`, `d`, `e` ] )
+        expect( find( `in 1 week` ) ).toEqual( [] ) // one day (Dec 1), not the whole week
+        expect( find( `on 2 dec` ) ).toEqual( [ `e` ] )
     } )
 
     it( `@label + several priorities = any of them`, () => {

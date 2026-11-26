@@ -27,14 +27,15 @@ const Panel = styled( Modal )`
 
     textarea.notes { font: inherit; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--page); padding: .6rem .75rem; min-height: 6rem; resize: vertical }
 
-    dl { display: grid; grid-template-columns: 7rem 1fr; gap: .35rem .75rem; align-items: center; margin: 0 }
+    dl { display: grid; grid-template-columns: 7rem minmax( 0, 1fr ); gap: .35rem .75rem; align-items: center; margin: 0 }
     dt { color: var(--muted); font-size: .88rem }
     dd { margin: 0 }
     dd input, dd select {
         width: 100%; min-height: 40px; padding: 0 .6rem; border-radius: var(--radius-sm);
         border: 1px solid var(--line-soft); background: var(--page);
     }
-    dd.pair { display: grid; grid-template-columns: 1fr 8rem; gap: .4rem }
+    dd.pair { display: grid; grid-template-columns: minmax( 0, 1fr ) minmax( 0, 7rem ); gap: .4rem; min-width: 0 }
+    dd.pair input { min-width: 0 }
     dd.pair input:disabled { opacity: .5 }
     .unparsed { color: var(--bad); font-size: .82rem }
 

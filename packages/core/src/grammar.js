@@ -38,6 +38,10 @@ const DATE_SRC = date_src( BARE_DOW_SRC )
 const PREFIXED_DATE_SRC = date_src( DOW_SRC )
 const TIME_SRC = String.raw`(?:noon|midnight|\d{1,2}(?::\d{2})?\s?(?:am|pm)|\d{1,2}:\d{2}|[01]\d[0-5]\d|2[0-3][0-5]\d|\d{1,2})`
 
+// Deadline times: explicit forms always, bare hours only when valid (0–23, or HHMM)
+const EXPLICIT_TIME_SRC = String.raw`(?:noon|midnight|(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s?(?:am|pm)|(?:[01]?\d|2[0-3]):[0-5]\d)`
+const BARE_HOUR_SRC = String.raw`(?:[01]\d[0-5]\d|2[0-3][0-5]\d|[01]?\d|2[0-3])(?!\d)`
+
 // `tom` means tomorrow, but capitalised `Tom` is a name ("Call Tom at 5")
 const names_tom = phrase => /\bTom\b/.test( phrase )
 
@@ -196,14 +200,13 @@ const RULES = [
         return recur.unparsed ? null : { value: recur }
     } },
 
-    // A time right after the date belongs to the deadline: `by tom 16`, `by fri at 5pm`.
-    // A bare number only counts at the end or before more grammar ("by fri 3 apples" stays text)
-    { type: `deadline`, regex: new RegExp( `${ B }(?:by|before)\\s+(?:${ PREFIXED_DATE_SRC })(?:\\s+(?:at\\s+(?<at_time>${ TIME_SRC })|(?<bare_time>${ TIME_SRC })(?=\\s*(?:$|[,.;!?)#@!]|p[1-4]\\b|every\\b))))?${ E }`, `gi` ), read: ( match, { today, week_start } ) => {
+    // A time right after the date belongs to the deadline: `by tom 16`, `by fri at 5pm`, `by fri 9:30`.
+    // Bare hours (16, 0930) count only at the end or before more grammar, like `at 5` does ("by fri 3.50 cable", "at 5 shops" stay text)
+    { type: `deadline`, regex: new RegExp( `${ B }(?:by|before)\\s+(?:${ PREFIXED_DATE_SRC })(?:\\s+(?:at\\s+)?(?<deadline_time>${ EXPLICIT_TIME_SRC }|(?:${ BARE_HOUR_SRC })(?=\\s*(?:$|[,;!?)#@!](?!\\d)|\\.(?!\\d)|p[1-4]\\b|every\\b))))?${ E }`, `gi` ), read: ( match, { today, week_start } ) => {
         if( names_tom( match[ 0 ] ) ) return null
         const [ phrase ] = match
-        const time_text = match.groups?.at_time ?? match.groups?.bare_time
+        const time_text = match.groups?.deadline_time
         const time = time_text && resolve_time_phrase( time_text )
-        if( time_text && !time ) return null
         const date = resolve_date_phrase( time_text ? phrase.slice( 0, phrase.lastIndexOf( time_text ) ).replace( /\s+at\s*$/i, `` ) : phrase, today, week_start )
         if( !date ) return null
         return { value: /^before/i.test( phrase ) ? add_days( date, -1 ) : date, ...time && { time } }

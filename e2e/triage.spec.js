@@ -70,3 +70,15 @@ test( `search reads shorthand`, async ( { page } ) => {
     await results( `#work`, [ `Pitch deck`, `Team lunch` ] )
     await results( `bank`, [ `Call bank` ] )
 } )
+
+test( `the deadline date + time fit a phone-width detail`, async ( { page } ) => {
+    await page.setViewportSize( { width: 375, height: 740 } )
+    await page.goto( `/triage` )
+    await add( page, `Narrow by tom 16` )
+    await page.goto( `/search?q=narrow` )
+    await card( page, `Narrow` ).click()
+    const detail = page.getByRole( `dialog`, { name: /Task: Narrow/ } )
+    const time = await detail.getByLabel( `Deadline time` ).boundingBox()
+    expect( time.x + time.width ).toBeLessThanOrEqual( 375 )
+    expect( await detail.evaluate( element => element.scrollWidth <= element.clientWidth ) ).toBe( true )
+} )

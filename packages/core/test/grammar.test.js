@@ -61,6 +61,10 @@ describe( `dates (§2.4 contract table)`, () => {
         expect( task_of( `Report before fri 9:30` ) ).toMatchObject( { deadline: `2026-11-26`, deadline_time: `09:30` } )
         expect( task_of( `Buy by fri 3 apples` ) ).toMatchObject( { title: `Buy 3 apples`, deadline: `2026-11-27`, deadline_time: null } )
         expect( task_of( `Report by 1 dec` ).deadline_time ).toBeNull()
+        expect( task_of( `Buy by fri 3.50m cable` ) ).toMatchObject( { title: `Buy 3.50m cable`, deadline_time: null } )
+        expect( task_of( `Buy gifts by fri at 5 shops` ) ).toMatchObject( { title: `Buy gifts at 5 shops`, deadline: `2026-11-27`, deadline_time: null } )
+        expect( task_of( `Pay by tom at 25` ) ).toMatchObject( { deadline: `2026-11-25`, deadline_time: null, scheduled: null } )
+        expect( task_of( `Pay by fri 9:30 sharp` ).deadline_time ).toBe( `09:30` )
     } )
 
     it( `past time today → tomorrow, future time → today`, () => {

@@ -7,8 +7,8 @@ test( `opens on Horizons and navigates every section; old links redirect`, async
     await expect( page.getByRole( `heading`, { name: `Horizons` } ) ).toBeVisible()
     await page.goto( `/horizons` )
     await expect( page ).toHaveURL( /\/horizons$/ )
-    await page.goto( `/inbox` )
-    await expect( page ).toHaveURL( /\/triage$/ )
+    await page.goto( `/inbox?task=nope` )
+    await expect( page ).toHaveURL( /\/triage\?task=nope$/ )
 
     const nav = page.getByRole( `navigation`, { name: `Main` } )
     await expect( nav.getByRole( `link`, { name: `Today` } ) ).toHaveCount( 0 )

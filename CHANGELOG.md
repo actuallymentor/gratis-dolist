@@ -19,6 +19,9 @@
 - Horizons uses the full width; list pages wider (60rem)
 
 ### Fixed
+- deadline times leave amounts alone (`by fri 3.50`, `at 5 shops`); an invalid hour keeps the deadline
+- search: `at 9`, `every …` and deadline cutoff times filter for real; `in 1 week` is one day; weekend correct on Sundays
+- deadline date + time fit phone-width task view; /inbox and /today links keep `?task=`
 - board scrolls inside itself instead of widening the page; a missing project's board is empty, not everything
 - a later #project token no longer keeps the earlier project's id
 - primary buttons readable in dark mode
