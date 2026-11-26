@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { Link, useParams } from 'react-router'
 import styled from 'styled-components'
 import toast from 'react-hot-toast'
 import { default_horizons_recipe, distribute, move } from '@dolist/core'
@@ -8,6 +9,7 @@ import Page from '../atoms/Page'
 import TaskCard from '../molecules/TaskCard'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { open_tasks } from '../../modules/selectors'
+import { use_project_scope } from '../../hooks/use_project_scope'
 
 // Cards rendered per lane before "Show more": keeps 10k-task boards light (plan §5)
 const PAGE = 50
@@ -51,8 +53,14 @@ const Mover = styled.div`
     small { color: var(--bad); text-align: right }
 `
 
+const Scope = styled.p`
+    margin: -.75rem 0 1.25rem; color: var(--muted); font-size: .9rem;
+    a { color: inherit }
+`
+
 /**
  * Horizons: the default recipe (rolling lanes, each task once by its soonest date).
+ * /horizons/:project_id scopes the board to a project and its subprojects.
  * Reschedule by dragging (live accept/refuse preview), the card's Move button, or M on a focused card.
  */
 export default function HorizonsPage() {
@@ -63,7 +71,11 @@ export default function HorizonsPage() {
     const recipe = useMemo( () => default_horizons_recipe(), [] )
     const ctx = useMemo( () => ( { today } ), [ today ] )
 
-    const { lanes, outside } = useMemo( () => distribute( open_tasks( tasks ), recipe, ctx ), [ tasks, recipe, ctx ] )
+    const { project_id } = useParams()
+    const { project, ids } = use_project_scope( project_id )
+    const scoped = useMemo( () => open_tasks( tasks ).filter( task => !ids || ids.has( task.project_id ) ), [ tasks, ids ] )
+
+    const { lanes, outside } = useMemo( () => distribute( scoped, recipe, ctx ), [ scoped, recipe, ctx ] )
     const board = useMemo( () => [ ...lanes, { ...SOMEDAY, tasks: outside } ], [ lanes, outside ] )
 
     const [ dragging, set_dragging ] = useState( null )
@@ -102,7 +114,9 @@ export default function HorizonsPage() {
     const verdict_of = lane => dragging ? move( dragging, lane.id, recipe, ctx ) : null
 
     return <div onKeyDown={ on_page_key }>
-        <Page title="Horizons" wide>
+        <Page title={ project ? `Horizons · ${ project.name }` : `Horizons` } wide>
+            { project && <Scope>{ project.path.replaceAll( `/`, ` / ` ) } and its subprojects · <Link to={ `/projects/${ project.id }` }>Task list</Link> · <Link to="/horizons">All projects</Link></Scope> }
+            { project_id && !project && <Scope>That project no longer exists. <Link to="/horizons">All projects</Link></Scope> }
             <Board>
                 { board.map( lane => {
                     const verdict = over === lane.id ? verdict_of( lane ) : null

@@ -130,6 +130,15 @@ describe( `priority, projects, labels, fields`, () => {
         expect( task_of( `Buy milk #Errands.` ).project ).toBe( `Errands` )
     } )
 
+    it( `rows give the project id; a full path picks the right same-named subproject`, () => {
+        const projects = [ { id: `w`, name: `Work` }, { id: `h`, name: `Home` }, { id: `wc`, name: `Clients`, parent_id: `w` }, { id: `hc`, name: `Clients`, parent_id: `h` } ]
+        const of = text => parse_quick_add( text, { today: `2026-11-26`, projects } ).task
+        expect( of( `x #Work` ) ).toMatchObject( { project: `Work`, project_id: `w` } )
+        expect( of( `x #Home/Clients` ) ).toMatchObject( { project: `Clients`, project_id: `hc` } )
+        expect( of( `x #Work/Clients` ).project_id ).toBe( `wc` )
+        expect( of( `x #Work/Nope` ).project_id ).toBeUndefined()
+    } )
+
     it( `unknown #project / @label → unknown span, removed from title`, () => {
         const { task, spans } = parse( `Fix bug #Garden @someday` )
         expect( task ).toMatchObject( { title: `Fix bug`, project: null, labels: [] } )

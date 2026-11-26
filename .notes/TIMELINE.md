@@ -22,3 +22,4 @@
 - 2026-11-26 — Welcome/home screen: shown once per page load when signed out (in-memory dismiss), sign in or continue without login; exempt /signin + /capture; no flash for devices with a sync owner.
 - 2026-11-26 — phoneafriend on welcome (5/5 agreed): covered app now inert (portal + root.inert), decision settled per load incl. exempt start and offline.
 - 2026-11-26: Horizons outside bucket → 5th lane "Someday" (lane id stays `outside` in core); Horizons full-width, list pages 60rem
+- 2026-11-26: Projects. Nested via parent_id (schema had it). `ensure_project(store, 'A/B')` finds/creates per level; grammar returns project_id for row matches (full path beats bare name). Kept the Enter-twice confirm for new #names (typo guard). Routes /projects, /projects/:id (deep: subprojects' tasks too), /horizons/:project_id. StoreProvider now wraps Shell.

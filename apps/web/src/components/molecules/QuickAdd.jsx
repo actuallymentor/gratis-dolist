@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import styled from 'styled-components'
 import { CalendarDays, Clock, Flag, Hash, Plus, Repeat, Tag, TriangleAlert } from 'lucide-react'
 import { parse_quick_add, resolve_date_label } from '@dolist/core'
-import { add_label, add_project, add_task, get_projects } from '@dolist/store'
+import { add_label, add_task, ensure_project } from '@dolist/store'
 import { use_labels, use_projects, use_store } from '@dolist/store/react'
 import toast from 'react-hot-toast'
 import Chip from '../atoms/Chip'
@@ -52,6 +52,7 @@ const chip_text = ( { type, value, raw }, today ) => {
  * The one capture line. Live highlights + chips for what the grammar understood.
  * The draft survives reloads and blocks silent app updates while unsent.
  * Unknown #project / @label are never created silently: Enter once shows the offer, Enter again creates.
+ * #Work/Clients creates (or finds) Clients under Work.
  */
 /**
  * @param {Object} props
@@ -90,7 +91,7 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     const parse = ( value, extra_projects = [], extra_labels = [] ) => parse_quick_add( value, {
         today,
         now: now_hhmm(),
-        projects: [ ...projects.map( ( { name } ) => name ), ...extra_projects ],
+        projects: [ ...projects, ...extra_projects ],
         labels: [ ...labels.map( ( { name } ) => name ), ...extra_labels ],
     } )
 
@@ -109,7 +110,7 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
     useEffect( () => () => mark_unsaved( id, false ), [ id, mark_unsaved ] )
 
     const create_unknowns = () => unknown.forEach( ( { type, value } ) => {
-        if( type === `project` ) add_project( store, { name: value } )
+        if( type === `project` ) ensure_project( store, value )
         if( type === `label` ) add_label( store, { name: value } )
     } )
 
@@ -125,12 +126,11 @@ export default function QuickAdd( { defaults = {}, placeholder = `Add a task… 
         const { task } = unknown.length ? parse( text, name_of( `project` ), name_of( `label` ) ) : parsed
         const submitted = text
 
-        const project_id = task.project
-            ? get_projects( store ).find( ( { name } ) => name.toLowerCase() === task.project.toLowerCase() )?.id
-            : defaults.project_id
+        // Known rows carry their id; just-created ones resolve by path
+        const project_id = task.project_id ?? ( task.project ? ensure_project( store, task.project ) : defaults.project_id )
         add_task( store, {
             ...task,
-            project_id: project_id ?? task.project_id ?? null,
+            project_id: project_id ?? null,
             project: task.project ?? undefined,
             scheduled: task.scheduled ?? defaults.scheduled ?? null,
         } )

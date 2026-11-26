@@ -47,18 +47,19 @@ export default function App() {
     }, [] )
     const ready = status === `ready`
 
+    // The provider wraps the shell (its project tree reads the store); pages and overlays still wait for `ready`
     return <QueryParamProvider adapter={ RouterAdapter }>
-        <Shell>
-            { ready && <StoreProvider store={ dolist.store }>
+        <StoreProvider store={ dolist.store }><Shell>
+            { ready && <>
                 <AppRoutes />
                 <Overlays />
-            </StoreProvider> }
+            </> }
             { status === `failed` && <Page title="Can't open your tasks">
                 <EmptyState icon={ DatabaseZap } title="Local data couldn't be read">
                     Nothing was changed or deleted. Close other Dolist tabs, then reload. If it keeps happening, check that your browser allows site storage.
                 </EmptyState>
             </Page> }
-        </Shell>
+        </Shell></StoreProvider>
         <Welcome />
         <Toaster position="bottom-center" toastOptions={ { style: TOAST_STYLE, duration: 5_000 } } />
         <UpdateBadge />

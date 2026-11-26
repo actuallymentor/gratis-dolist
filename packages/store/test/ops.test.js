@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-    add_label, add_project, add_task, complete_task, completed_history, create_dolist_store, delete_task,
-    get_labels, get_task, get_tasks, restore_task, search_tasks, set_labels, uncomplete_task, update_task,
+    add_label, add_project, add_task, ensure_project, complete_task, completed_history, create_dolist_store, delete_task,
+    get_labels, get_projects, get_task, get_tasks, restore_task, search_tasks, set_labels, uncomplete_task, update_task,
 } from '../src/index.js'
 
 // Memory store with a controllable clock
@@ -209,6 +209,25 @@ describe( `search_tasks`, () => {
         expect( search_tasks( store, `beta` ) ).toHaveLength( 0 )
         update_task( store, id, { notes: `béta` } )
         expect( search_tasks( store, `beta` ) ).toHaveLength( 1 )
+    } )
+
+} )
+
+describe( `ensure_project`, () => {
+
+    it( `finds or creates each level of a path, case-insensitively`, () => {
+        const { store } = make()
+        const clients = ensure_project( store, `#Work/Clients` )
+        const work = get_projects( store ).find( ( { name } ) => name === `Work` )
+        expect( store.getCell( `projects`, clients, `parent_id` ) ).toBe( work.id )
+        expect( ensure_project( store, `work/clients` ) ).toBe( clients )
+        expect( ensure_project( store, `Work` ) ).toBe( work.id )
+
+        // Same name under another parent is a different project
+        const home_clients = ensure_project( store, `Home/Clients` )
+        expect( home_clients ).not.toBe( clients )
+        expect( get_projects( store ) ).toHaveLength( 4 )
+        expect( ensure_project( store, ` / ` ) ).toBeNull()
     } )
 
 } )

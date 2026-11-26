@@ -45,3 +45,5 @@
 - `--accent-strong` is light in dark mode: text on it must be `var(--page)`, never `#fff`.
 - e2e on a focused button: typing a space presses it (WebKit navigates). Type test text without spaces when a button may hold focus.
 - e2e runs against wrangler dev serving apps/web/dist: `npm run build` before e2e or you test stale UI
+- Draft slot names must not contain `:` (drafts key is `name:tab`; orphan adoption would misattribute). Project drafts use `project-<id>`.
+- Shell reads the store (project tree): StoreProvider must wrap Shell, routes still gated on `ready`.

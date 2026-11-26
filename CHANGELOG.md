@@ -3,6 +3,9 @@
 ## 2026-11-26
 
 ### Added
+- nested projects: `#Work/Clients` creates/finds each level; project pages + Projects index
+- sidebar lists every project under Projects (tasks) and Horizons (its own board); phones get a Projects tab
+- `n` on a project page files the task into that project
 - Horizons: Someday lane (undated or beyond a quarter) replaces “Outside this view”
 - welcome screen on load when signed out: sign in or continue without login
 

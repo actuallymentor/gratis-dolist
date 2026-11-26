@@ -28,3 +28,4 @@
 - Bare `at 1`–`at 6` = afternoon (13–18h); `at 7`+ and leading zero (`at 05`) as written. Flip if you think in 24h only.
 - Bare `at N` only counts at the end or touching other shorthand (`Meet at 5 shops` stays text).
 - `tom` = tomorrow, but capitalised `Tom` is a name (`Call Tom at 5` → only the time parses).
+- 2026-11-26 Projects: new `#name` still needs Enter twice (create offer) — typo guard from the original spec. No rename/delete/reorder UI for projects yet. Sidebar shows the full tree twice (Projects + Horizons), as asked; may get long with many projects (no collapse yet).

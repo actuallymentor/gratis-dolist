@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Trash2, X } from 'lucide-react'
 import { parse_quick_add } from '@dolist/core'
-import { add_task, delete_task, get_projects, restore_task, set_labels, update_task } from '@dolist/store'
+import { add_task, delete_task, restore_task, set_labels, update_task } from '@dolist/store'
 import { use_labels, use_projects, use_store, use_tasks } from '@dolist/store/react'
 import toast from 'react-hot-toast'
 import TaskCard from './TaskCard'
@@ -12,6 +12,7 @@ import { use_today } from '../../hooks/use_today'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { use_app_store } from '../../stores/app'
 import { flush } from '../../modules/dolist'
+import { project_tree } from '../../modules/selectors'
 
 const Panel = styled( Modal )`
     display: flex; flex-direction: column; gap: 1rem; padding: .75rem 1.25rem 1.5rem;
@@ -72,7 +73,7 @@ const parse_title = ( text, ctx, kept ) => {
 }
 
 // Only what the title's shorthand actually said; a bare time keeps an existing date
-const shorthand_patch = ( task, { task: parsed, spans }, project_id_of ) => {
+const shorthand_patch = ( task, { task: parsed, spans } ) => {
     const has = type => spans.some( span => span.type === type && !span.unknown )
     return {
         literal_mask: parsed.literal_mask ?? null,
@@ -81,7 +82,7 @@ const shorthand_patch = ( task, { task: parsed, spans }, project_id_of ) => {
         ...has( `deadline` ) && { deadline: parsed.deadline },
         ...has( `priority` ) && { priority: parsed.priority },
         ...has( `recur` ) && { recur: parsed.recur },
-        ...has( `project` ) && { project_id: project_id_of( parsed.project ) },
+        ...has( `project` ) && { project_id: parsed.project_id ?? null },
         ...has( `label` ) && { labels: [ ...new Set( [ ...task.labels || [], ...parsed.labels ] ) ] },
     }
 }
@@ -125,6 +126,7 @@ export default function TaskDetail( { task, on_close } ) {
 
     const store = use_store()
     const projects = use_projects()
+    const tree = useMemo( () => project_tree( projects ), [ projects ] )
     const labels = use_labels()
     const today = use_today()
     const all_tasks = use_tasks()
@@ -144,7 +146,7 @@ export default function TaskDetail( { task, on_close } ) {
     const parse_ctx = () => ( {
         today,
         now: new Date().toTimeString().slice( 0, 5 ),
-        projects: projects.map( ( { name } ) => name ),
+        projects,
         labels: labels.map( ( { name } ) => name ),
     } )
     const read_title = text => {
@@ -156,14 +158,13 @@ export default function TaskDetail( { task, on_close } ) {
         return anchored ? { ...parse_title( text, { ...parse_ctx(), today: task.scheduled, now: undefined }, kept ), highlights: parsed.highlights } : parsed
     }
     const title_highlights = useMemo( () => title_dirty ? read_title( title ).highlights : [], [ title, title_dirty, today, projects, labels, task ] ) // read_title is recreated per render
-    const project_id_of = name => get_projects( store ).find( project => project.name.toLowerCase() === name?.toLowerCase() )?.id ?? null
 
     // Each committer writes only what the user edited here
     const save_title = () => {
         if( !title_dirty || !title.trim() ) return
         const parsed = read_title( title )
         const clean = parsed.task.title.trim() || task.title
-        save( { title: clean, ...shorthand_patch( task, parsed, project_id_of ) } )
+        save( { title: clean, ...shorthand_patch( task, parsed ) } )
         settle_title( clean )
     }
     const save_notes = () => {
@@ -227,7 +228,7 @@ export default function TaskDetail( { task, on_close } ) {
     const add_sub = event => {
         event.preventDefault()
         if( !sub_text.trim() ) return
-        const { task: parsed } = parse_quick_add( sub_text, { today, projects: projects.map( ( { name } ) => name ), labels: labels.map( ( { name } ) => name ) } )
+        const { task: parsed } = parse_quick_add( sub_text, { today, labels: labels.map( ( { name } ) => name ) } )
         add_task( store, { ...parsed, parent_id: task.id, project_id: task.project_id ?? null } )
         set_sub_text( `` )
     }
@@ -277,7 +278,7 @@ export default function TaskDetail( { task, on_close } ) {
             <dt><label htmlFor="d-project">Project</label></dt>
             <dd><select id="d-project" value={ task.project_id || `` } onChange={ ( { target: { value } } ) => save( { project_id: value || null } ) }>
                 <option value="">Inbox</option>
-                { projects.map( ( { id, name } ) => <option key={ id } value={ id }>{ name }</option> ) }
+                { tree.map( ( { id, name, depth } ) => <option key={ id } value={ id }>{ `\u2003`.repeat( depth ) }{ name }</option> ) }
             </select></dd>
 
             <dt><label htmlFor="d-labels">Labels</label></dt>

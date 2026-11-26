@@ -15,7 +15,7 @@ const Capture = styled( QuickAdd )`
 
 /**
  * Global capture (`n` from anywhere): quick add in a centered modal, own draft slot.
- * On Today, new tasks default to today, like the page's own box. Closes once the task is handed off.
+ * On Today, new tasks default to today; on a project (list or board) they file into it, like the pages' own boxes. Closes once the task is handed off.
  */
 export default function QuickAddModal() {
 
@@ -34,7 +34,8 @@ export default function QuickAddModal() {
 
     if( !open ) return null
 
-    const defaults = pathname.startsWith( `/today` ) ? { scheduled: today } : {}
+    const project_id = pathname.match( /^\/(?:projects|horizons)\/([^/]+)/ )?.[ 1 ]
+    const defaults = pathname.startsWith( `/today` ) ? { scheduled: today } : project_id ? { project_id } : {}
 
     return <Modal label="New task" on_close={ close }>
         <Capture

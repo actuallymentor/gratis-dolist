@@ -7,7 +7,7 @@ const ROWS = [
     [ `at 3pm`, `Time: at 18, at 09:30, at 1500, at 5 (= 17:00)` ],
     [ `every week`, `Repeats from the scheduled date. every! = from completion` ],
     [ `!1 … !4`, `Priority (p1 … p4 also work)` ],
-    [ `#home`, `Project. #"Two words" for spaces` ],
+    [ `#home`, `Project (Enter twice creates a new one). #Work/Clients nests, #"Two words" for spaces` ],
     [ `@errands`, `Label` ],
     [ `"by the sea"`, `Quoted text stays in the title` ],
 ]

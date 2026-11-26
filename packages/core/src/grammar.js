@@ -144,7 +144,7 @@ export const resolve_time_phrase = phrase => {
 
 const loose = name => `${ name }`.toLowerCase().replace( /[\s_-]+/g, ` ` ).trim()
 
-// Projects as names, "Parent/Child" paths, or { id, name, parent_id } rows (paths derived)
+// Projects as names, "Parent/Child" paths, or { id, name, parent_id } rows (paths derived; a full path beats a bare name)
 const project_index = projects => {
     const rows = projects.map( project => typeof project === `string` ? { name: project } : project )
     const by_id = new Map( rows.filter( row => row.id ).map( row => [ row.id, row ] ) )
@@ -152,10 +152,10 @@ const project_index = projects => {
         const parent = row.parent_id && by_id.get( row.parent_id )
         return parent && guard ? `${ path_of( parent, guard - 1 ) }/${ row.name }` : row.name
     }
-    return rows.map( row => ( { name: row.name, keys: [ loose( row.name ), loose( path_of( row ) ) ] } ) )
+    return rows.map( row => ( { id: row.id, name: row.name, keys: [ loose( row.name ), loose( path_of( row ) ) ] } ) )
 }
 
-const find_project = ( index, wanted ) => index.find( ( { keys } ) => keys.includes( loose( wanted ) ) )
+const find_project = ( index, wanted ) => index.find( ( { keys } ) => keys[ 1 ] === loose( wanted ) ) || index.find( ( { keys } ) => keys.includes( loose( wanted ) ) )
 
 const names_of = list => list.map( item => typeof item === `string` ? item : item.name )
 
@@ -174,7 +174,11 @@ const named = ( type, match, { project_index: index, labels } ) => {
     const wanted = quoted ?? trim_name( match[ 3 ] )
     if( !wanted || !quoted && /^\d+$/.test( wanted ) ) return null
 
-    const known = type === `project` ? find_project( index, wanted )?.name : labels.find( label => loose( label ) === loose( wanted ) )
+    if( type === `project` ) {
+        const project = find_project( index, wanted )
+        return project ? { value: project.name, ...project.id && { id: project.id } } : { value: wanted, unknown: true }
+    }
+    const known = labels.find( label => loose( label ) === loose( wanted ) )
     return known ? { value: known } : { value: wanted, unknown: true }
 }
 
@@ -331,7 +335,8 @@ const SINGLE = [ `date`, `deadline`, `time`, `recur`, `priority`, `project` ]
  * @param {Array<string|object>} [options.labels] - names or { name }
  * @param {Array<string|object>} [options.field_defs] - names or { name, type: `text`|`number` }
  * @param {Array<[number, number]>} [options.literal_ranges] - input ranges kept verbatim in the title ("Keep as title")
- * @returns {{ task: object, spans: object[] }} spans carry type, start, end, raw, value (+ unknown / conflict)
+ * @returns {{ task: object, spans: object[] }} spans carry type, start, end, raw, value (+ unknown / conflict);
+ *   a project matched from a row also sets task.project_id (span.id)
  */
 export const parse_quick_add = ( text = ``, { today, week_start = 1, now, projects = [], labels = [], field_defs = [], literal_ranges = [] } = {} ) => {
 
@@ -358,8 +363,9 @@ export const parse_quick_add = ( text = ``, { today, week_start = 1, now, projec
 
     // Fold spans into the task, in reading order
     const blank = { title: ``, scheduled: null, deadline: null, time: null, priority: null, project: null, labels: [], recur: null, fields: {} }
-    const folded = flagged.filter( span => !span.unknown && span.type !== `literal` ).reduce( ( task, { type, value } ) => {
+    const folded = flagged.filter( span => !span.unknown && span.type !== `literal` ).reduce( ( task, { type, value, id } ) => {
         if( type === `date` ) return { ...task, scheduled: value }
+        if( type === `project` ) return { ...task, project: value, ...id && { project_id: id } }
         if( type === `label` ) return { ...task, labels: [ ...new Set( [ ...task.labels, value ] ) ] }
         if( type === `field` ) return { ...task, fields: { ...task.fields, [ value.name ]: value.value } }
         return { ...task, [ type ]: value }

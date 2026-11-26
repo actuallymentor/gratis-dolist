@@ -4,7 +4,7 @@
 import { v7 as uuid } from 'uuid'
 import { pair_key, split_key } from './schema.js'
 import { now_of } from './clock.js'
-import { parse_recur } from './view.js'
+import { get_projects, parse_recur } from './view.js'
 import * as core from '@dolist/core'
 
 // Fields that selectors derive; never written back as cells
@@ -302,5 +302,22 @@ export const add_project = ( store, fields ) => {
     const id = uuid()
     store.setRow( `projects`, id, { ...to_cells( rest ), name: clean_name( name ), created_at: now_of( store ) } )
     return id
+}
+
+/**
+ * Finds or creates a project by path: `Work/Clients` = Clients under Work, each missing level created
+ * @param {Object} store
+ * @param {string} path - `/`-separated names, optional leading #
+ * @returns {string|null} id of the last level, null for an empty path
+ */
+export const ensure_project = ( store, path ) => {
+
+    const names = clean_name( path ?? `` ).split( `/` ).map( name => name.trim() ).filter( Boolean )
+    const live = get_projects( store )
+
+    return names.reduce( ( parent_id, name ) => {
+        const found = live.find( project => ( project.parent_id || null ) === parent_id && same_name( project.name, name ) )
+        return found?.id ?? add_project( store, { name, parent_id } )
+    }, null )
 }
 
