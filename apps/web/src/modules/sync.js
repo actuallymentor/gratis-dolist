@@ -48,6 +48,8 @@ export const refresh_account = async () => {
         return account
     } catch {
         return null
+    } finally {
+        use_app_store.getState().set_session_checked( true )
     }
 }
 

@@ -7,6 +7,7 @@
 
 ### Fixed
 - primary buttons readable in dark mode
+- welcome screen blocks keys to the app behind it; never appears mid-session
 
 ## 2026-11-25
 

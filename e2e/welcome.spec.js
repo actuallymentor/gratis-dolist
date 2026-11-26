@@ -25,6 +25,30 @@ test( `signed out: shows on load, continue dismisses until the next load`, async
     await expect( welcome( page ) ).toBeVisible()
 } )
 
+test( `the covered app takes no keys`, async ( { page } ) => {
+
+    await page.goto( `/inbox` )
+    await expect( welcome( page ) ).toBeVisible()
+    await page.keyboard.type( `ghosttask` ) // no space: that would press the focused Sign in button
+    for( const key of [ `Tab`, `Tab`, `Tab`, `Shift+Tab`, `Shift+Tab`, `Shift+Tab` ] ) {
+        await page.keyboard.press( key )
+        expect( await page.evaluate( () => !!document.activeElement?.closest( `#root` ) ) ).toBe( false )
+    }
+
+    await page.getByRole( `button`, { name: `Continue without login` } ).click()
+    await expect( page.getByRole( `textbox`, { name: `New task` } ) ).toHaveValue( `` )
+} )
+
+test( `a load that starts on capture stays uninterrupted`, async ( { page } ) => {
+
+    await page.goto( `/capture` )
+    await expect( page.getByRole( `textbox`, { name: `New task` } ) ).toBeVisible()
+    await page.goto( `/capture` )
+    await page.evaluate( () => history.pushState( {}, ``, `/inbox` ) || dispatchEvent( new PopStateEvent( `popstate` ) ) )
+    await expect( page.getByRole( `heading`, { name: `Inbox` } ) ).toBeVisible()
+    await expect( welcome( page ) ).toHaveCount( 0 )
+} )
+
 test( `sign in goes to the sign-in page`, async ( { page } ) => {
 
     await page.goto( `/inbox` )

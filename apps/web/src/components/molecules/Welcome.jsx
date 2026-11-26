@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 import styled from 'styled-components'
 import { CalendarDays, Columns3, LogIn, RefreshCw } from 'lucide-react'
@@ -59,15 +60,31 @@ const Screen = styled.div`
 export default function Welcome() {
 
     const account = use_app_store( state => state.account )
-    const [ dismissed, set_dismissed ] = useState( skipped )
+    const session_checked = use_app_store( state => state.session_checked )
     const { pathname } = useLocation()
     const navigate = useNavigate()
 
-    // Once this load is known to be signed in, it's settled: signing out later doesn't pop the screen
-    if( account?.signed_in && !dismissed ) set_dismissed( true )
+    // A load that starts on an exempt page (installed-app capture, an email link) stays exempt while navigating
+    const [ dismissed, set_dismissed ] = useState( () => skipped || EXEMPT.some( path => pathname.startsWith( path ) ) )
 
     const signed_out = account ? !account.signed_in : !local_owner()
-    if( dismissed || !signed_out || EXEMPT.some( path => pathname.startsWith( path ) ) ) return null
+    const visible = !dismissed && signed_out
+
+    // Decided once per load: when the first session check finishes signed in (or offline on a synced device),
+    // a later sign-out or revocation never pops the screen over work in progress
+    if( session_checked && !signed_out && !dismissed ) set_dismissed( true )
+
+    // The covered app is inert while showing: no hidden autofocus steals keys, Tab can't leave the screen
+    useLayoutEffect( () => {
+        const root = document.getElementById( `root` )
+        if( !visible || !root ) return
+        root.inert = true
+        return () => {
+            root.inert = false
+        }
+    }, [ visible ] )
+
+    if( !visible ) return null
 
     const sign_in = () => {
         set_dismissed( true )
@@ -75,7 +92,7 @@ export default function Welcome() {
     }
 
     // role="dialog" also pauses the global shortcuts underneath
-    return <Screen>
+    return createPortal( <Screen>
         <div role="dialog" aria-modal="true" aria-label="Welcome to Dolist">
             <span className="brand"><img src="/favicon.svg" alt="" />Dolist</span>
 
@@ -96,5 +113,5 @@ export default function Welcome() {
             </div>
             <p className="note">Without an account, tasks stay on this device.</p>
         </div>
-    </Screen>
+    </Screen>, document.body )
 }
