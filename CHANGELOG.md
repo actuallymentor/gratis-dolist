@@ -3,7 +3,11 @@
 ## 2026-11-26
 
 ### Added
+- Horizons: Someday lane (undated or beyond a quarter) replaces “Outside this view”
 - welcome screen on load when signed out: sign in or continue without login
+
+### Changed
+- Horizons uses the full width; list pages wider (60rem)
 
 ### Fixed
 - primary buttons readable in dark mode

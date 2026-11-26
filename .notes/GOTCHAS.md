@@ -44,3 +44,4 @@
 - Welcome screen covers every fresh signed-out load. e2e skips it via `dolist:skip-welcome` (storageState `SKIP_WELCOME` in e2e/welcome.js; config default + every `browser.newContext`). New manual contexts must pass it.
 - `--accent-strong` is light in dark mode: text on it must be `var(--page)`, never `#fff`.
 - e2e on a focused button: typing a space presses it (WebKit navigates). Type test text without spaces when a button may hold focus.
+- e2e runs against wrangler dev serving apps/web/dist: `npm run build` before e2e or you test stale UI

@@ -198,15 +198,14 @@ test( `subtasks can be completed and opened from the parent`, async ( { page } )
     await expect( page.getByRole( `dialog`, { name: /Task: Child step/ } ) ).toBeVisible()
 } )
 
-test( `Move button works without a keyboard, incl. to No date`, async ( { page } ) => {
+test( `Move button works without a keyboard, incl. to Someday`, async ( { page } ) => {
     await page.goto( `/inbox` )
     await add( page, `Tap mover today` )
     await page.goto( `/horizons` )
     await page.getByRole( `button`, { name: `Move Tap mover` } ).click()
-    await page.getByRole( `menuitem`, { name: /No date/ } ).click()
+    await page.getByRole( `menuitem`, { name: /Someday/ } ).click()
     await expect( page.getByRole( `region`, { name: `Today` } ).getByRole( `button`, { name: `Tap mover`, exact: true } ) ).toHaveCount( 0 )
-    await page.getByText( /Outside this view/ ).click()
-    await expect( page.getByRole( `button`, { name: `Tap mover`, exact: true } ) ).toBeVisible()
+    await expect( page.getByRole( `region`, { name: `Someday` } ).getByRole( `button`, { name: `Tap mover`, exact: true } ) ).toBeVisible()
 } )
 
 test( `submitting in one tab keeps another tab's draft`, async ( { page, context } ) => {

@@ -132,7 +132,7 @@ export const move = ( task, lane_id, recipe, ctx ) => {
     if( !to_outside && target < 0 ) return { refused: true, reason: `That lane doesn't exist any more` }
 
     const lane = lanes[ target ]
-    const name = to_outside ? `Outside this view` : lane.name
+    const name = to_outside ? `Someday` : lane.name
     const fits = candidate => {
         if( to_outside ) return lanes.every( each => !each.fn( candidate, ctx ) )
         return recipe.cascade ? first_lane( candidate, lanes, ctx ) === target : lane.fn( candidate, ctx )

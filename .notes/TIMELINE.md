@@ -21,3 +21,4 @@
 - 2026-11-25 — phoneafriend (5/5 codex personas agreed): fixed literal_mask loss on edit, unknown-name time wipe, decimals as hours, keys behind Move menu, modal focus trap/restore, recurrence re-anchoring.
 - 2026-11-26 — Welcome/home screen: shown once per page load when signed out (in-memory dismiss), sign in or continue without login; exempt /signin + /capture; no flash for devices with a sync owner.
 - 2026-11-26 — phoneafriend on welcome (5/5 agreed): covered app now inert (portal + root.inert), decision settled per load incl. exempt start and offline.
+- 2026-11-26: Horizons outside bucket → 5th lane "Someday" (lane id stays `outside` in core); Horizons full-width, list pages 60rem

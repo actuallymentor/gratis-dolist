@@ -1,26 +1,27 @@
 import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
-import { ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { default_horizons_recipe, distribute, move } from '@dolist/core'
 import { update_task } from '@dolist/store'
 import { use_store, use_tasks } from '@dolist/store/react'
 import Page from '../atoms/Page'
 import TaskCard from '../molecules/TaskCard'
-import TaskList from '../molecules/TaskList'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { open_tasks } from '../../modules/selectors'
 
 // Cards rendered per lane before "Show more": keeps 10k-task boards light (plan §5)
 const PAGE = 50
 
-const OUTSIDE = { id: `outside`, name: `No date` }
+// Everything no rolling lane takes (undated, or further out than a quarter); dropping here clears the date
+const SOMEDAY = { id: `outside`, name: `Someday` }
 
+// Lanes share the full width; below ~5 × 15rem the board scrolls sideways (snapping per lane), phones stack
 const Board = styled.div`
-    display: grid; grid-template-columns: repeat( 4, minmax( 0, 1fr ) ); gap: 1rem; align-items: start;
+    display: grid; grid-template-columns: repeat( 5, minmax( 15rem, 1fr ) ); gap: 1rem; align-items: start;
+    overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: .5rem;
+    > section { scroll-snap-align: start }
 
-    @media ( max-width: 960px ) { grid-template-columns: repeat( 2, minmax( 0, 1fr ) ) }
-    @media ( max-width: 560px ) { grid-template-columns: 1fr }
+    @media ( max-width: 560px ) { grid-template-columns: 1fr; overflow-x: visible }
 `
 
 const Lane = styled.section`
@@ -50,14 +51,6 @@ const Mover = styled.div`
     small { color: var(--bad); text-align: right }
 `
 
-const Outside = styled.details`
-    margin-top: 2rem;
-    summary { cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; list-style: none }
-    summary::-webkit-details-marker { display: none }
-    &[open] summary svg { transform: rotate( 180deg ) }
-    > div { margin-top: .5rem }
-`
-
 /**
  * Horizons: the default recipe (rolling lanes, each task once by its soonest date).
  * Reschedule by dragging (live accept/refuse preview), the card's Move button, or M on a focused card.
@@ -71,12 +64,12 @@ export default function HorizonsPage() {
     const ctx = useMemo( () => ( { today } ), [ today ] )
 
     const { lanes, outside } = useMemo( () => distribute( open_tasks( tasks ), recipe, ctx ), [ tasks, recipe, ctx ] )
+    const board = useMemo( () => [ ...lanes, { ...SOMEDAY, tasks: outside } ], [ lanes, outside ] )
 
     const [ dragging, set_dragging ] = useState( null )
     const [ over, set_over ] = useState( null )
     const [ moving, set_moving ] = useState( null )
     const [ shown, set_shown ] = useState( {} )
-    const [ outside_open, set_outside_open ] = useState( false )
 
     const try_move = ( task, lane ) => {
         const result = move( task, lane.id, recipe, ctx )
@@ -95,7 +88,7 @@ export default function HorizonsPage() {
         set_dragging( task )
     }, [ tasks ] )
 
-    // M on any focused card (board or outside list) opens the Move command
+    // M on any focused card opens the Move command
     const on_page_key = event => {
         if( event.key.toLowerCase() !== `m` || event.metaKey || event.ctrlKey || event.altKey ) return
         if( /input|textarea|select/i.test( event.target.tagName ) ) return
@@ -111,7 +104,7 @@ export default function HorizonsPage() {
     return <div onKeyDown={ on_page_key }>
         <Page title="Horizons" wide>
             <Board>
-                { lanes.map( lane => {
+                { board.map( lane => {
                     const verdict = over === lane.id ? verdict_of( lane ) : null
                     const limit = shown[ lane.id ] || PAGE
                     return <Lane key={ lane.id } aria-label={ lane.name }
@@ -145,16 +138,12 @@ export default function HorizonsPage() {
                 } ) }
             </Board>
 
-            { !!outside.length && <Outside onToggle={ event => set_outside_open( event.currentTarget.open ) }>
-                <summary><ChevronDown size={ 16 } aria-hidden /> Outside this view ({ outside.length })</summary>
-                { outside_open && <TaskList tasks={ outside } today={ today } on_complete={ on_complete } on_open={ on_open } on_move={ on_move } /> }
-            </Outside> }
         </Page>
 
         { moving && <Mover onClick={ () => set_moving( null ) } onKeyDown={ event => event.key === `Escape` && set_moving( null ) }>
             <div role="menu" aria-label={ `Move ${ moving.title }` } onClick={ event => event.stopPropagation() }>
                 <p>Move “{ moving.title }” to…</p>
-                { [ ...lanes, OUTSIDE ].map( ( lane, index ) => {
+                { board.map( ( lane, index ) => {
                     const verdict = move( moving, lane.id, recipe, ctx )
                     return <button key={ lane.id } role="menuitem" autoFocus={ index === 0 } aria-disabled={ !!verdict.refused }
                         onClick={ () => {

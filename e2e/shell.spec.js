@@ -14,9 +14,9 @@ test( `opens on Today and navigates every section`, async ( { page } ) => {
 
 } )
 
-test( `Horizons shows the four rolling lanes`, async ( { page } ) => {
+test( `Horizons shows the four rolling lanes plus Someday`, async ( { page } ) => {
     await page.goto( `/horizons` )
-    for( const lane of [ `Today`, `This week`, `This month`, `This quarter` ] ) {
+    for( const lane of [ `Today`, `This week`, `This month`, `This quarter`, `Someday` ] ) {
         await expect( page.getByRole( `region`, { name: lane } ) ).toBeVisible()
     }
 } )

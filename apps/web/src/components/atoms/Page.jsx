@@ -1,9 +1,9 @@
 import styled from 'styled-components'
 
 const Wrap = styled.main`
-    max-width: ${ ( { $wide } ) => $wide ? `1200px` : `46rem` };
-    margin: 0 auto;
-    padding: 2rem 1rem 6rem;
+    max-width: ${ ( { $wide } ) => $wide ? `none` : `60rem` };
+    min-width: 0; margin: 0 auto;
+    padding: 2rem ${ ( { $wide } ) => $wide ? `1.5rem` : `1rem` } 6rem;
 
     header { display: flex; align-items: baseline; gap: .75rem; margin-bottom: 1.5rem }
     h1 { font-size: 1.625rem }
