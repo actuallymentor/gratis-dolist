@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { authenticator, close_devices, device, mail, new_email, request_link, sign_in_by_code, sign_in_by_link, status, tenant } from './account.js'
+import { SKIP_WELCOME } from './welcome.js'
 
 // M2 exit criteria against real wrangler dev (Worker + Auth/Sync DOs), signing in like a person:
 // email link (or its code), passkeys. Each test is its own deployment (see ./account.js).
@@ -239,7 +240,7 @@ test( `backup now, download, import into an empty browser = restore`, async ( { 
     const [ download ] = await Promise.all( [ a.page.waitForEvent( `download` ), a.page.getByRole( `link`, { name: /Download backup/ } ).first().click() ] )
     const file = await download.path()
 
-    const fresh = await ( await browser.newContext() ).newPage()
+    const fresh = await ( await browser.newContext( { storageState: SKIP_WELCOME } ) ).newPage()
     await fresh.goto( `/settings` )
     await fresh.getByLabel( `Import file` ).setInputFiles( file )
     await expect( fresh.getByText( `Imported` ) ).toBeVisible()

@@ -45,7 +45,7 @@ const Shared = styled.form`
     .notes { color: var(--muted); font-size: .88rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8rem; overflow: auto }
     .actions { display: flex; gap: .5rem; flex-wrap: wrap }
     button { min-height: 44px; padding: 0 1rem; border-radius: 999px; cursor: pointer; border: 1px solid var(--line); background: var(--page) }
-    button[type="submit"] { background: var(--accent-strong); border-color: transparent; color: #fff }
+    button[type="submit"] { background: var(--accent-strong); border-color: transparent; color: var(--page) }
 `
 
 const Footer = styled.p`

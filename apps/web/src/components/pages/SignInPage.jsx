@@ -25,7 +25,7 @@ const Card = styled.section`
         display: inline-flex; align-items: center; justify-content: center; gap: .5rem; font-size: .95rem;
         border: 1px solid var(--line); background: var(--page); color: var(--fg);
     }
-    button.primary { background: var(--accent-strong); border-color: transparent; color: #fff }
+    button.primary { background: var(--accent-strong); border-color: transparent; color: var(--page) }
     button:disabled { opacity: .6; cursor: default }
     button.link { min-height: 44px; border: 0; background: none; padding: 0; justify-content: flex-start; color: var(--accent-strong); text-decoration: underline }
 

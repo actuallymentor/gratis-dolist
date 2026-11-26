@@ -41,3 +41,5 @@
 - Global keys (`use_shortcuts`) bail while any `[role="dialog"]` exists; new overlays must carry that role or j/k/e act behind them. e2e: wait for the page heading before pressing keys (store loads async, Overlays mount after).
 - Modal opener focus must be captured at render (`useState` init): child `autoFocus` runs before effects, so an effect sees the dialog's own input.
 - Edited titles carry stored `literal_mask` by substring match (TaskDetail `carry_masks`); without it, quoted text from capture parses on the next edit.
+- Welcome screen covers every fresh signed-out load. e2e skips it via `dolist:skip-welcome` (storageState `SKIP_WELCOME` in e2e/welcome.js; config default + every `browser.newContext`). New manual contexts must pass it.
+- `--accent-strong` is light in dark mode: text on it must be `var(--page)`, never `#fff`.

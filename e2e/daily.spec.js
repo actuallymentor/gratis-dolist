@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { SKIP_WELCOME } from './welcome.js'
 
 // M1 daily core, driven like a user. Each test gets a fresh browser context (empty IndexedDB).
 
@@ -127,7 +128,7 @@ test( `export then import round-trips`, async ( { page, browser } ) => {
     const file = await download.path()
 
     // Fresh, empty browser profile imports the file
-    const fresh = await ( await browser.newContext() ).newPage()
+    const fresh = await ( await browser.newContext( { storageState: SKIP_WELCOME } ) ).newPage()
     await fresh.goto( `/settings` )
     await fresh.getByLabel( `Import file` ).setInputFiles( file )
     await expect( fresh.getByText( `Imported` ) ).toBeVisible()

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { SKIP_WELCOME } from './e2e/welcome.js'
 
 
 // E2E runs against the real Worker (wrangler dev serving apps/web/dist), as prod does
@@ -9,7 +10,8 @@ export default defineConfig( {
     // Local: half of a big box's cores (16+) starves WebKit into timeouts; CI keeps the default
     workers: process.env.CI ? undefined : 8,
     reporter: process.env.CI ? `github` : `list`,
-    use: { baseURL: `http://localhost:8787`, trace: `retain-on-failure` },
+    // Every test starts past the sign-in welcome screen; e2e/welcome.spec.js opts back in
+    use: { baseURL: `http://localhost:8787`, trace: `retain-on-failure`, storageState: SKIP_WELCOME },
     projects: [
         { name: `desktop`, use: { ...devices[ `Desktop Chrome` ] }, testIgnore: /heavy\.spec/ },
         { name: `phone`, use: { ...devices[ `Pixel 7` ] }, testIgnore: /heavy\.spec/ },

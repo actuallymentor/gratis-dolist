@@ -13,6 +13,7 @@ import UpdateBadge from './components/molecules/UpdateBadge'
 import Cheatsheet from './components/molecules/Cheatsheet'
 import OpenTask from './components/molecules/OpenTask'
 import QuickAddModal from './components/molecules/QuickAddModal'
+import Welcome from './components/molecules/Welcome'
 import { use_task_actions } from './hooks/use_task_actions'
 import { use_shortcuts } from './hooks/use_shortcuts'
 import { dolist } from './modules/dolist'
@@ -58,6 +59,7 @@ export default function App() {
                 </EmptyState>
             </Page> }
         </Shell>
+        <Welcome />
         <Toaster position="bottom-center" toastOptions={ { style: TOAST_STYLE, duration: 5_000 } } />
         <UpdateBadge />
         <InstallPill />

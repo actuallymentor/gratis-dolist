@@ -13,7 +13,7 @@ const Pill = styled.button`
 
     &:hover { transform: translateY( -1px ) }
     &:active { transform: scale( .985 ) }
-    &[data-tone="accent"] { background: var(--accent-strong); border-color: transparent; color: #fff }
+    &[data-tone="accent"] { background: var(--accent-strong); border-color: transparent; color: var(--page) }
 
     @media ( max-width: 720px ) { bottom: calc( 4.75rem + env(safe-area-inset-bottom) ); ${ ( { $side } ) => $side === `right` ? `` : `left: 1rem;` } }
 `

@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test'
+import { SKIP_WELCOME } from './welcome.js'
 
 // Shared e2e helpers for signed-in flows. Each test is its own deployment: the E2E-only `dolist_tenant`
 // cookie picks an isolated Auth DO, and mail lands in its outbox (GET /api/e2e/outbox) instead of being sent.
@@ -18,7 +19,7 @@ export const close_devices = () => Promise.all( opened.splice( 0 ).map( context 
  * @returns {Promise<{ context, page }>}
  */
 export const device = async ( browser, id ) => {
-    const context = await browser.newContext()
+    const context = await browser.newContext( { storageState: SKIP_WELCOME } )
     opened.push( context )
     await context.addCookies( [ { name: `dolist_tenant`, value: id, url: `http://localhost:8787` } ] )
     return { context, page: await context.newPage() }

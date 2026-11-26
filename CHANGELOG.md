@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-26
+
+### Added
+- welcome screen on load when signed out: sign in or continue without login
+
+### Fixed
+- primary buttons readable in dark mode
+
 ## 2026-11-25
 
 ### Added
