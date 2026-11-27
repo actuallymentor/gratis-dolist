@@ -3,7 +3,7 @@ import { AtSign, CircleCheck, Columns3, FolderTree, ListFilter, LogIn, PanelLeft
 /**
  * Sidebar items by key (order + visibility: modules/sidebar, per device).
  *   to = route (absent = a button) · tree = projects/labels listed under it · desktop_only = not in the phone tab bar
- *   bottom = pinned to the sidebar's foot while it stays at the end of the order
+ *   bottom = sits at the sidebar's foot while it stays at the end of the order · pinned = can't be hidden (the way back)
  */
 export const NAV_ITEMS = {
     add: { label: `Add task`, Icon: Plus },
@@ -14,6 +14,6 @@ export const NAV_ITEMS = {
     search: { to: `/search`, label: `Search`, Icon: Search },
     completed: { to: `/completed`, label: `Completed`, Icon: CircleCheck, desktop_only: true },
     signin: { to: `/signin`, label: `Sign in`, Icon: LogIn, desktop_only: true, signed_out_only: true, bottom: true },
-    settings: { to: `/settings`, label: `Settings`, Icon: Settings, bottom: true },
+    settings: { to: `/settings`, label: `Settings`, Icon: Settings, bottom: true, pinned: true },
     customize: { label: `Sidebar settings`, Icon: PanelLeft, desktop_only: true, bottom: true },
 }

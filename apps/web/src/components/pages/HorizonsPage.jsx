@@ -105,7 +105,8 @@ export default function HorizonsPage() {
     // The Move key (m by default, rebindable) on any focused card opens the Move command
     const move_key = use_app_store( state => state.keymap.move )
     const on_page_key = event => {
-        if( combo_of( event ) !== move_key ) return
+        const combo = combo_of( event )
+        if( !combo || combo !== move_key ) return
         if( /input|textarea|select/i.test( event.target.tagName ) ) return
         const card = event.target.closest?.( `[data-task-id]` )
         const task = card && tasks.find( ( { id } ) => id === card.dataset.taskId )

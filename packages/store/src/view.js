@@ -306,6 +306,45 @@ const list_rows = ( store, table, include_deleted ) => store.getRowIds( table )
 export const get_projects = ( store, { include_deleted = false } = {} ) => list_rows( store, `projects`, include_deleted )
 
 /**
+ * Effective parent per live project: unknown/deleted parents = top level, and a loop (two devices moving A under B
+ * and B under A offline) is cut at its smallest id. Tree, scope, move and delete all read parents through this,
+ * so what the sidebar shows is what Delete takes.
+ * @param {Array<{ id: string, parent_id?: string }>} projects - live rows
+ * @returns {Map<string, string|null>}
+ */
+export const project_parents = projects => {
+    const ids = new Set( projects.map( ( { id } ) => id ) )
+    const parent_of = new Map( projects.map( ( { id, parent_id } ) => [ id, ids.has( parent_id ) ? parent_id : null ] ) )
+    projects.forEach( ( { id } ) => {
+        const walk = []
+        let at = id
+        while( at && !walk.includes( at ) ) {
+            walk.push( at )
+            at = parent_of.get( at )
+        }
+        if( at ) parent_of.set( walk.slice( walk.indexOf( at ) ).sort()[ 0 ], null )
+    } )
+    return parent_of
+}
+
+/**
+ * A project and all its (effective) descendants
+ * @param {Array<{ id: string, parent_id?: string }>} projects - live rows
+ * @param {string} id
+ * @returns {Set<string>}
+ */
+export const project_subtree = ( projects, id ) => {
+    const parent_of = project_parents( projects )
+    const ids = new Set( [ id ] )
+    let before = 0
+    while( before !== ids.size ) {
+        before = ids.size
+        projects.forEach( project => ids.has( parent_of.get( project.id ) ) && ids.add( project.id ) )
+    }
+    return ids
+}
+
+/**
  * Labels sorted by name.
  * @param {Object} store
  * @param {Object} [options]

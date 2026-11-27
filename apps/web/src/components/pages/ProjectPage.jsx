@@ -53,8 +53,9 @@ const ProjectEditor = ( { project, on_done } ) => {
     const navigate = useNavigate()
     const projects = use_projects()
     const tasks = use_tasks()
-    const [ name, set_name ] = useState( project.name )
-    const [ parent_id, set_parent_id ] = useState( project.parent_id || `` )
+    const [ initial ] = useState( () => ( { name: project.name, parent_id: project.parent_id || `` } ) )
+    const [ name, set_name ] = useState( initial.name )
+    const [ parent_id, set_parent_id ] = useState( initial.parent_id )
     const [ error, set_error ] = useState( null )
 
     // Possible parents: everything outside this project's own subtree (by id: same-named projects elsewhere stay)
@@ -69,8 +70,8 @@ const ProjectEditor = ( { project, on_done } ) => {
         event.preventDefault()
         if( name.includes( `/` ) ) return set_error( `Names can't contain "/": that's how #Parent/Child is written.` )
         const changes = {
-            ...name.trim() !== project.name && { name },
-            ...parent_id !== ( project.parent_id || `` ) && { parent_id: parent_id || null },
+            ...name.trim() !== initial.name && { name },
+            ...parent_id !== initial.parent_id && { parent_id: parent_id || null },
         }
         const refused = Object.keys( changes ).length ? update_project( store, project.id, changes ) : null
         if( refused ) return set_error( REFUSED[ refused ] )

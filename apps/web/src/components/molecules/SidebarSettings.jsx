@@ -26,7 +26,7 @@ const Body = styled.div`
 
 /**
  * Sidebar settings: tick what shows, reorder with the arrows (or drag rows in the sidebar itself).
- * Hiding "Sidebar settings" is allowed: Settings → Sidebar brings this back.
+ * Settings can't be hidden: it's the way back here (Settings → Sidebar), on phones too.
  */
 export default function SidebarSettings() {
 
@@ -57,12 +57,12 @@ export default function SidebarSettings() {
             <p>Choose what shows and in which order.</p>
             <ol>
                 { order.map( ( key, index ) => {
-                    const { label, Icon, desktop_only } = NAV_ITEMS[ key ]
+                    const { label, Icon, desktop_only, pinned } = NAV_ITEMS[ key ]
                     return <li key={ key }>
                         <label>
-                            <input type="checkbox" checked={ !hidden.includes( key ) } onChange={ () => toggle( key ) } />
+                            <input type="checkbox" checked={ pinned || !hidden.includes( key ) } disabled={ pinned } onChange={ () => toggle( key ) } />
                             <Icon size={ 18 } strokeWidth={ 1.5 } aria-hidden />
-                            <span>{ label } { desktop_only && <small>desktop</small> }</span>
+                            <span>{ label } { desktop_only && <small>desktop</small> }{ pinned && <small>always shown</small> }</span>
                         </label>
                         <button type="button" onClick={ () => shift( index, -1 ) } disabled={ index === 0 } aria-label={ `Move ${ label } up` }><ArrowUp size={ 16 } strokeWidth={ 1.75 } aria-hidden /></button>
                         <button type="button" onClick={ () => shift( index, 1 ) } disabled={ index === order.length - 1 } aria-label={ `Move ${ label } down` }><ArrowDown size={ 16 } strokeWidth={ 1.75 } aria-hidden /></button>

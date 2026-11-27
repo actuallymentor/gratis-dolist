@@ -49,7 +49,11 @@ export default function Cheatsheet() {
     useEffect( () => {
         const on_key = event => {
             const typing = /input|textarea|select/i.test( event.target.tagName ) || event.target.isContentEditable
-            if( combo_of( event ) === keymap.cheatsheet && !typing ) set_open( value => !value )
+            const combo = combo_of( event )
+            if( combo && combo === keymap.cheatsheet && !typing ) {
+                event.preventDefault() // a rebound chord (Ctrl+F) mustn't also run the browser's action
+                set_open( value => !value )
+            }
             if( event.key === `Escape` ) set_open( false )
         }
         window.addEventListener( `keydown`, on_key )

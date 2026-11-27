@@ -18,6 +18,7 @@ test( `sidebar settings hide, show and reorder items; the layout survives a relo
 
     await page.goto( `/horizons` )
     let dialog = await open_sidebar_settings( page, isMobile )
+    await expect( dialog.getByRole( `checkbox`, { name: /Settings/ } ).first() ).toBeDisabled() // the way back stays
     await dialog.getByRole( `checkbox`, { name: `Search` } ).uncheck()
     await dialog.getByRole( `button`, { name: `Move Projects up` } ).click()
     await dialog.getByRole( `button`, { name: `Done` } ).click()
@@ -111,6 +112,15 @@ test( `shortcuts rebind to single keys and combinations`, async ( { page, isMobi
     await expect( page.getByRole( `dialog`, { name: `Cheatsheet` } ) ).toContainText( `Shift+A` )
     await page.keyboard.press( `Escape` )
     await page.goto( `/settings` )
+    // Cleared (Backspace) = unbound: a lone Shift must not trigger it
+    const sheet_key = page.getByRole( `button`, { name: /^Shortcut for Cheatsheet/ } )
+    await sheet_key.click()
+    await page.keyboard.press( `Backspace` )
+    await expect( sheet_key ).toHaveAccessibleName( `Shortcut for Cheatsheet: —` )
+    await page.locator( `body` ).click()
+    await page.keyboard.press( `Shift` )
+    await expect( page.getByRole( `dialog`, { name: `Cheatsheet` } ) ).toHaveCount( 0 )
+
     await page.getByRole( `button`, { name: `Reset shortcuts` } ).click()
     await expect( add_key ).toHaveAccessibleName( `Shortcut for Add task: N` )
 } )

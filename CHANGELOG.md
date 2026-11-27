@@ -18,6 +18,10 @@
 - projects moved into each other on two offline devices no longer vanish (loop cut at merge)
 - rename/move refuses a sibling with the same name; editor saves only changed fields; parent list by id
 - project Undo restores exactly what was deleted; Delete says how many subprojects/tasks it affects
+- project loops are cut the same way for display, scope and delete; editor diffs against what it opened with
+- cleared shortcuts no longer fire on a lone modifier; a rebound cheatsheet chord blocks the browser action
+- label Undo merges into a same-named label made meanwhile; label counts match label pages; any label name is safe
+- Settings can't be hidden from the sidebar (it's the way back to Sidebar settings)
 
 ## 2026-11-26
 

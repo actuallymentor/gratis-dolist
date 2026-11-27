@@ -1,3 +1,5 @@
+import { project_parents, project_subtree } from '@dolist/store'
+
 // Open = not completed, not deleted, top-level (subtasks live in their parent's detail)
 const is_open = ( { completed_at, deleted_at, parent_id } ) => !completed_at && !deleted_at && !parent_id
 
@@ -30,23 +32,7 @@ export const open_tasks = tasks => tasks.filter( is_open )
  * @returns {Array<object & { depth: number, path: string }>}
  */
 export const project_tree = projects => {
-
-    // Parent per project; unknown/deleted parents = top level
-    const ids = new Set( projects.map( ( { id } ) => id ) )
-    const parent_of = new Map( projects.map( ( { id, parent_id } ) => [ id, ids.has( parent_id ) ? parent_id : null ] ) )
-
-    // Two devices moving A under B and B under A offline merge into a loop: cut each loop at its smallest id,
-    // so every project stays reachable (and movable back out)
-    projects.forEach( ( { id } ) => {
-        const walk = []
-        let at = id
-        while( at && !walk.includes( at ) ) {
-            walk.push( at )
-            at = parent_of.get( at )
-        }
-        if( at ) parent_of.set( walk.slice( walk.indexOf( at ) ).sort()[ 0 ], null )
-    } )
-
+    const parent_of = project_parents( projects )
     const children = parent_id => projects.filter( ( { id } ) => parent_of.get( id ) === parent_id )
     const walk = ( parent_id, depth, prefix ) => children( parent_id ).flatMap( project => {
         const path = prefix ? `${ prefix }/${ project.name }` : project.name
@@ -61,16 +47,7 @@ export const project_tree = projects => {
  * @param {string} id
  * @returns {Set<string>}
  */
-export const subtree_ids = ( projects, id ) => {
-    const ids = new Set( [ id ] )
-    let grew = true
-    while( grew ) {
-        const before = ids.size
-        projects.forEach( project => ids.has( project.parent_id ) && ids.add( project.id ) )
-        grew = ids.size > before
-    }
-    return ids
-}
+export const subtree_ids = project_subtree
 
 // Open tasks in a project or any of its subprojects
 export const project_tasks = ( tasks, ids ) => tasks.filter( task => is_open( task ) && ids.has( task.project_id ) ).sort( by_soonest )

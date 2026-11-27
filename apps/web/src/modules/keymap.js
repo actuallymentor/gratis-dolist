@@ -60,5 +60,5 @@ export const write_keymap = keymap => {
     } catch { /* private mode: lasts for this session */ }
 }
 
-// The action bound to a combo, if any
-export const action_for = ( keymap, combo ) => combo && Object.keys( keymap ).find( id => keymap[ id ] === combo )
+// The action bound to a combo, if any (null combos = lone modifiers, never an unbound action)
+export const action_for = ( keymap, combo ) => combo ? Object.keys( keymap ).find( id => keymap[ id ] === combo ) : undefined

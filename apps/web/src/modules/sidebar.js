@@ -14,7 +14,7 @@ export const normalize_layout = ( { order = [], hidden = [] } = {} ) => {
     const known = order.filter( ( key, index ) => SIDEBAR_ITEMS.includes( key ) && order.indexOf( key ) === index )
     return {
         order: [ ...known, ...SIDEBAR_ITEMS.filter( key => !known.includes( key ) ) ],
-        hidden: hidden.filter( key => SIDEBAR_ITEMS.includes( key ) ),
+        hidden: hidden.filter( key => SIDEBAR_ITEMS.includes( key ) && key !== `settings` ), // Settings is the way back: never hidden
     }
 }
 

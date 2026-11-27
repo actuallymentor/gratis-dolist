@@ -4,7 +4,7 @@
 import { v7 as uuid } from 'uuid'
 import { pair_key, split_key } from './schema.js'
 import { now_of } from './clock.js'
-import { get_projects, parse_recur } from './view.js'
+import { get_projects, parse_recur, project_subtree } from './view.js'
 import * as core from '@dolist/core'
 
 // Fields that selectors derive; never written back as cells
@@ -82,12 +82,21 @@ export const delete_label = ( store, id ) => {
 }
 
 /**
- * Undoes delete_label.
+ * Undoes delete_label. If another live label took the name meanwhile, the tasks join that one instead
+ * (two live labels with one name would be indistinguishable), and this one stays deleted.
  * @param {Object} store
  * @param {string} id
  */
 export const restore_label = ( store, id ) => {
-    if( store.hasRow( `labels`, id ) ) store.delCell( `labels`, id, `deleted_at` )
+
+    if( !store.hasRow( `labels`, id ) ) return
+    const taken = find_label( store, store.getCell( `labels`, id, `name` ) ?? `` )
+    if( !taken || taken === id ) return store.delCell( `labels`, id, `deleted_at` )
+
+    store.transaction( () => store.forEachRow( `task_labels`, key => {
+        const [ task_id, label_id ] = split_key( key )
+        if( label_id === id && store.getCell( `task_labels`, key, `on` ) ) store.setCell( `task_labels`, pair_key( task_id, taken ), `on`, true )
+    } ) )
 }
 
 // Names → label ids, creating missing labels
@@ -356,17 +365,7 @@ export const ensure_project = ( store, path ) => {
 }
 
 
-// A project and every live descendant (cycle-safe)
-const subtree_of = ( store, id ) => {
-    const live = get_projects( store )
-    const ids = new Set( [ id ] )
-    let before = 0
-    while( before !== ids.size ) {
-        before = ids.size
-        live.forEach( project => ids.has( project.parent_id ) && ids.add( project.id ) )
-    }
-    return ids
-}
+const subtree_of = ( store, id ) => project_subtree( get_projects( store ), id )
 
 /**
  * Renames and/or moves a project; only the fields passed change. Refused (reason returned, nothing written):

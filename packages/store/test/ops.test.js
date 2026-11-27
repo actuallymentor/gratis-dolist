@@ -296,6 +296,29 @@ describe( `label CRUD`, () => {
         expect( get_task( store, task ).labels ).toEqual( [ `errands` ] )
         restore_label( store, phone )
         expect( get_task( store, task ).labels ).toEqual( [ `Calls`, `errands` ] )
+
+        // Name taken meanwhile: Undo merges into the live label instead of making a twin
+        delete_label( store, phone )
+        const other = add_task( store, { title: `Fax`, labels: [ `calls` ] } )
+        restore_label( store, phone )
+        expect( get_labels( store ).filter( ( { name } ) => name.toLowerCase() === `calls` ) ).toHaveLength( 1 )
+        expect( get_task( store, task ).labels ).toEqual( [ `calls`, `errands` ] )
+        expect( get_task( store, other ).labels ).toEqual( [ `calls` ] )
+    } )
+
+} )
+
+describe( `project loops (merged offline moves)`, () => {
+
+    it( `are cut at the smallest id: deleting the shown child keeps the shown parent`, () => {
+        const { store } = make()
+        const a = add_project( store, { name: `A` } )
+        const b = add_project( store, { name: `B`, parent_id: a } )
+        store.setCell( `projects`, a, `parent_id`, b ) // what a merge of two offline moves leaves behind
+
+        const [ root, child ] = [ a, b ].sort()
+        expect( delete_project( store, child ) ).toEqual( [ child ] )
+        expect( get_projects( store ).map( ( { id } ) => id ) ).toEqual( [ root ] )
     } )
 
 } )

@@ -40,9 +40,11 @@ export default function LabelsPage() {
     const tasks = use_tasks()
     const [ draft, set_draft ] = useState( `` )
 
+    // Same tasks the label page lists (open, top-level). A Map: label names are user text (`__proto__` included)
     const counts = useMemo( () => {
-        const tally = {}
-        tasks.filter( task => !task.completed_at && !task.deleted_at ).forEach( ( { labels: names = [] } ) => names.forEach( name => tally[ name ] = ( tally[ name ] || 0 ) + 1 ) )
+        const tally = new Map()
+        tasks.filter( task => !task.completed_at && !task.deleted_at && !task.parent_id )
+            .forEach( ( { labels: names = [] } ) => names.forEach( name => tally.set( name, ( tally.get( name ) || 0 ) + 1 ) ) )
         return tally
     }, [ tasks ] )
 
@@ -60,7 +62,7 @@ export default function LabelsPage() {
         </Create>
         { labels.length ? <List>
             { labels.map( label => <li key={ label.id }>
-                <Link to={ `/labels/${ label.id }` }>@{ label.name } <span>{ counts[ label.name ] || `` }</span></Link>
+                <Link to={ `/labels/${ label.id }` }>@{ label.name } <span>{ counts.get( label.name ) || `` }</span></Link>
             </li> ) }
         </List> : <EmptyState icon={ AtSign } title="No labels yet">Add one above, or add a task with @name.</EmptyState> }
     </Page>
