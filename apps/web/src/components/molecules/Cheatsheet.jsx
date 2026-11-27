@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
+import { ACTIONS, combo_of, format_combo } from '../../modules/keymap'
+import { use_app_store } from '../../stores/app'
 
 const ROWS = [
     [ `fri`, `Scheduled date: today, tom(orrow), mon…sun, 12 nov, in 3 days, next week` ],
@@ -20,14 +22,10 @@ const SEARCH = [
     [ `next week`, `Anything dated next week` ],
 ]
 
-const KEYS = [
-    [ `n`, `Add task, from anywhere` ],
-    [ `j / k`, `Next / previous task` ],
+// Keys come from the (rebindable) keymap; Enter and Esc are fixed
+const keys_of = keymap => [
+    ...ACTIONS.map( ( { id, label } ) => [ format_combo( keymap[ id ] ), label ] ),
     [ `Enter`, `Open selected task` ],
-    [ `e`, `Complete selected task` ],
-    [ `m`, `Move selected task (Horizons)` ],
-    [ `/`, `Search` ],
-    [ `?`, `This sheet` ],
     [ `Esc`, `Close` ],
 ]
 
@@ -42,20 +40,21 @@ const Sheet = styled.div`
     dd { margin: 0; font-size: .9rem }
 `
 
-// "?" opens the grammar + shortcut sheet from anywhere (except while typing)
+// The cheatsheet key ("?" by default) opens the grammar + shortcut sheet from anywhere (except while typing)
 export default function Cheatsheet() {
 
     const [ open, set_open ] = useState( false )
+    const keymap = use_app_store( state => state.keymap )
 
     useEffect( () => {
         const on_key = event => {
-            const typing = /input|textarea|select/i.test( event.target.tagName )
-            if( event.key === `?` && !typing ) set_open( value => !value )
+            const typing = /input|textarea|select/i.test( event.target.tagName ) || event.target.isContentEditable
+            if( combo_of( event ) === keymap.cheatsheet && !typing ) set_open( value => !value )
             if( event.key === `Escape` ) set_open( false )
         }
         window.addEventListener( `keydown`, on_key )
         return () => window.removeEventListener( `keydown`, on_key )
-    }, [] )
+    }, [ keymap.cheatsheet ] )
 
     if( !open ) return null
 
@@ -66,7 +65,7 @@ export default function Cheatsheet() {
             <h3>Search</h3>
             <dl>{ SEARCH.map( ( [ term, text ] ) => [ <dt key={ term }>{ term }</dt>, <dd key={ `${ term }-d` }>{ text }</dd> ] ) }</dl>
             <h3>Keys</h3>
-            <dl>{ KEYS.map( ( [ term, text ] ) => [ <dt key={ term }>{ term }</dt>, <dd key={ `${ term }-d` }>{ text }</dd> ] ) }</dl>
+            <dl>{ keys_of( keymap ).map( ( [ term, text ] ) => [ <dt key={ text }>{ term }</dt>, <dd key={ `${ text }-d` }>{ text }</dd> ] ) }</dl>
         </div>
     </Sheet>
 }

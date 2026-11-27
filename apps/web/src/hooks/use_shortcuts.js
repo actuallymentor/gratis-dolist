@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { use_app_store } from '../stores/app'
+import { action_for, combo_of, is_chord } from '../modules/keymap'
 
 // Selection = keyboard focus on a card's title button, so Enter opens it natively and Tab/mouse stay in sync
 const cards = () => [ ...document.querySelectorAll( `[data-task-id]` ) ].filter( card => !card.closest( `[role="dialog"]` ) && card.offsetParent )
@@ -30,33 +31,37 @@ const complete = () => {
 }
 
 /**
- * Global single-key shortcuts; ignored while typing in a field or while a dialog / menu is open.
- *   n new task (modal) · / search · j/k next/previous task · e complete · Enter open (native on the focused title)
+ * Global shortcuts, rebindable in Settings (modules/keymap; defaults: n new task · / search · j/k next/previous · e complete).
+ * Single keys are ignored while typing; chords (ctrl/alt/meta) work everywhere. Nothing fires while a dialog / menu is open.
+ * Enter opens the focused card natively. Move (m) lives on Horizons, the cheatsheet (?) in Cheatsheet: same keymap.
  */
 export const use_shortcuts = () => {
 
     const navigate = useNavigate()
     const open_quick_add = use_app_store( state => state.set_quick_add_open )
+    const keymap = use_app_store( state => state.keymap )
 
     useEffect( () => {
         const on_key = event => {
-            if( event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented ) return
-            if( /input|textarea|select/i.test( event.target.tagName ) || event.target.isContentEditable ) return
+            if( event.defaultPrevented ) return
+            const combo = combo_of( event )
+            const typing = /input|textarea|select/i.test( event.target.tagName ) || event.target.isContentEditable
+            if( !combo || typing && !is_chord( combo ) ) return
             if( document.querySelector( `[role="dialog"], [role="menu"]` ) ) return
 
             const actions = {
-                '/': () => navigate( `/search` ),
-                n: () => open_quick_add( true ),
-                j: () => move( 1 ),
-                k: () => move( -1 ),
-                e: complete,
+                search: () => navigate( `/search` ),
+                add: () => open_quick_add( true ),
+                next: () => move( 1 ),
+                previous: () => move( -1 ),
+                complete,
             }
-            const action = actions[ event.key ]
+            const action = actions[ action_for( keymap, combo ) ]
             if( !action ) return
             event.preventDefault()
             action()
         }
         window.addEventListener( `keydown`, on_key )
         return () => window.removeEventListener( `keydown`, on_key )
-    }, [ navigate, open_quick_add ] )
+    }, [ navigate, open_quick_add, keymap ] )
 }

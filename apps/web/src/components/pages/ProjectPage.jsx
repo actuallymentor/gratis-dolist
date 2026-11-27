@@ -10,7 +10,7 @@ import EmptyState from '../atoms/EmptyState'
 import TaskList from '../molecules/TaskList'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { use_project_scope } from '../../hooks/use_project_scope'
-import { project_tasks, project_tree } from '../../modules/selectors'
+import { project_tasks, project_tree, subtree_ids } from '../../modules/selectors'
 import { flush } from '../../modules/dolist'
 
 const Links = styled.nav`
@@ -33,44 +33,61 @@ const Edit = styled.form`
     button[type="submit"] { background: var(--accent-strong); border-color: transparent; color: var(--page) }
     .delete { margin-left: auto; color: var(--bad) }
     .error { grid-column: 1 / -1; color: var(--bad); font-size: .88rem }
+    .note { grid-column: 1 / -1; color: var(--muted); font-size: .85rem }
 
     @media ( max-width: 480px ) { grid-template-columns: minmax( 0, 1fr ) }
 `
 
-// Rename, move under another project (never into its own subtree), or delete with Undo
+const REFUSED = {
+    name: `A project needs a name.`,
+    cycle: `A project can't go inside itself or its subprojects.`,
+    taken: `There's already a project with that name there.`,
+    missing: `This project no longer exists.`,
+}
+
+// Rename, move under another project (never into its own subtree), or delete with Undo.
+// Saves only what you changed, so a rename here never undoes a move made on another device meanwhile
 const ProjectEditor = ( { project, on_done } ) => {
 
     const store = use_store()
     const navigate = useNavigate()
     const projects = use_projects()
+    const tasks = use_tasks()
     const [ name, set_name ] = useState( project.name )
     const [ parent_id, set_parent_id ] = useState( project.parent_id || `` )
     const [ error, set_error ] = useState( null )
 
-    // Possible parents: everything outside this project's own subtree
-    const parents = useMemo( () => {
-        const tree = project_tree( projects )
-        return tree.filter( ( { path } ) => path !== project.path && !path.startsWith( `${ project.path }/` ) )
-    }, [ projects, project.path ] )
+    // Possible parents: everything outside this project's own subtree (by id: same-named projects elsewhere stay)
+    const own = useMemo( () => subtree_ids( projects, project.id ), [ projects, project.id ] )
+    const parents = useMemo( () => project_tree( projects ).filter( ( { id } ) => !own.has( id ) ), [ projects, own ] )
+
+    // What Delete takes with it, said before the click
+    const subprojects = own.size - 1
+    const affected = tasks.filter( task => !task.completed_at && !task.deleted_at && own.has( task.project_id ) ).length
 
     const save = event => {
         event.preventDefault()
         if( name.includes( `/` ) ) return set_error( `Names can't contain "/": that's how #Parent/Child is written.` )
-        const saved = update_project( store, project.id, { name, parent_id: parent_id || null } )
-        if( !saved ) return set_error( `A project needs a name.` )
+        const changes = {
+            ...name.trim() !== project.name && { name },
+            ...parent_id !== ( project.parent_id || `` ) && { parent_id: parent_id || null },
+        }
+        const refused = Object.keys( changes ).length ? update_project( store, project.id, changes ) : null
+        if( refused ) return set_error( REFUSED[ refused ] )
         on_done()
     }
 
     const remove = async () => {
-        delete_project( store, project.id )
+        const deleted = delete_project( store, project.id )
         navigate( `/projects`, { replace: true } )
         const saved = await flush().then( () => true, () => false )
         if( !saved ) return
-        toast( t => <span>Deleted “{ project.name }” <button onClick={ () => {
-            restore_project( store, project.id )
+        const more = deleted.length > 1 ? ` and ${ deleted.length - 1 } subproject${ deleted.length > 2 ? `s` : `` }` : ``
+        toast( t => <span>Deleted “{ project.name }”{ more } <button onClick={ () => {
+            restore_project( store, deleted )
             toast.dismiss( t.id )
         } }
-        >Undo</button></span> )
+        >Undo</button></span>, { duration: 10_000 } )
     }
 
     return <Edit onSubmit={ save } aria-label="Edit project">
@@ -81,11 +98,19 @@ const ProjectEditor = ( { project, on_done } ) => {
         } }
         />
         <label htmlFor="p-parent">Inside</label>
-        <select id="p-parent" value={ parent_id } onChange={ ( { target: { value } } ) => set_parent_id( value ) }>
+        <select id="p-parent" value={ parent_id } onChange={ ( { target: { value } } ) => {
+            set_parent_id( value )
+            set_error( null )
+        } }
+        >
             <option value="">No parent (top level)</option>
             { parents.map( ( { id, name: label, depth } ) => <option key={ id } value={ id }>{ `\u2003`.repeat( depth ) }{ label }</option> ) }
         </select>
         { error && <p className="error" role="alert">{ error }</p> }
+        { ( subprojects > 0 || affected > 0 ) && <p className="note">
+            Deleting also removes { subprojects > 0 ? `${ subprojects } subproject${ subprojects > 1 ? `s` : `` }` : `no subprojects` };
+            { ` ${ affected } open task${ affected === 1 ? `` : `s` }` } become unfiled.
+        </p> }
         <div className="actions">
             <button type="submit">Save</button>
             <button type="button" onClick={ on_done }>Cancel</button>

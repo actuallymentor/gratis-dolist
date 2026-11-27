@@ -4,11 +4,20 @@
 
 ### Added
 - project CRUD: New project form on Projects (`Work/Clients` ok); Edit on a project page renames, moves (never into its own subtree), deletes with Undo
-- sidebar trees fold: chevron per group (Horizons, Projects) and per parent project, remembered per device
+- sidebar trees fold: chevron per group (Horizons, Projects, Labels) and per parent project, remembered per device
+- rebindable shortcuts (Settings → Keyboard shortcuts): single keys or combos (Shift/Ctrl/Alt/⌘), conflicts refused, Reset
+- sidebar: drag rows to reorder; Sidebar settings modal shows/hides/reorders every item (also Settings → Sidebar)
+- Labels: sidebar item with label list, /labels (create, counts), label pages (rename, delete with Undo)
+- Install pill gets a × (dismissed per device); Settings keeps an Install row
 
 ### Changed
 - Triage toggles now narrow: No date / No deadline / No project (default: No date + No deadline); URL keys `no_date`, `no_deadline`, `no_project`
 - task detail: unfiled option reads "No project" (was "Inbox")
+
+### Fixed
+- projects moved into each other on two offline devices no longer vanish (loop cut at merge)
+- rename/move refuses a sibling with the same name; editor saves only changed fields; parent list by id
+- project Undo restores exactly what was deleted; Delete says how many subprojects/tasks it affects
 
 ## 2026-11-26
 

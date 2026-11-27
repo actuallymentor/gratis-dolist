@@ -101,6 +101,7 @@ test( `projects CRUD: create from the Projects page, rename, move, delete with U
 
     // Delete: back to Projects, the task reads unfiled (Triage); Undo restores both
     await page.getByRole( `button`, { name: `Edit` } ).click()
+    await expect( page.getByRole( `form`, { name: `Edit project` } ) ).toContainText( `1 open task become` )
     await page.getByRole( `button`, { name: `Delete project` } ).click()
     await expect( page ).toHaveURL( /\/projects$/ )
     await expect( page.getByRole( `link`, { name: /^Customers/ } ) ).toHaveCount( 0 )

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import styled from 'styled-components'
-import { Download, RefreshCw, Share, Upload } from 'lucide-react'
+import { Download, PanelLeft, RefreshCw, Share, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { from_todoist } from '@dolist/core'
 import { export_json, import_json, import_todoist } from '@dolist/store'
@@ -10,6 +10,8 @@ import { download_json, fetch_todoist } from '../../modules/todoist'
 import { flush } from '../../modules/dolist'
 import Page from '../atoms/Page'
 import SyncSection from '../molecules/SyncSection'
+import KeymapSection from '../molecules/KeymapSection'
+import { use_app_store } from '../../stores/app'
 import { apply_theme, read_theme } from '../../modules/theme'
 import { hard_update, is_ios, is_standalone } from '../../modules/pwa'
 import { build_hash } from '../../modules/build'
@@ -34,6 +36,9 @@ const Rows = styled.div`
         min-height: 44px; padding: 0 .9rem; border-radius: 999px; cursor: pointer;
         border: 1px solid var(--line); background: var(--page);
     }
+    button.key { min-width: 6rem; justify-content: center; font-family: var(--font-mono, ui-monospace, monospace) }
+    button.key[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint) }
+    kbd { font: inherit }
     button, .file { display: inline-flex; align-items: center; gap: .4rem; font-size: .94rem; white-space: nowrap; flex-shrink: 0 }
 `
 
@@ -49,6 +54,9 @@ const Build = styled.p`
 export default function SettingsPage() {
 
     const store = use_store()
+    const open_sidebar_settings = use_app_store( state => state.set_sidebar_settings_open )
+    const install_prompt = use_app_store( state => state.install_prompt )
+    const set_install_prompt = use_app_store( state => state.set_install_prompt )
     const [ token, set_token ] = useState( `` )
     const [ importing, set_importing ] = useState( false )
 
@@ -114,6 +122,18 @@ export default function SettingsPage() {
                     <option value="dark">Dark</option>
                 </select>
             </label>
+            <div className="row">
+                <span>Sidebar<small>Show, hide and reorder its items.</small></span>
+                <button type="button" onClick={ () => open_sidebar_settings( true ) }><PanelLeft size={ 16 } strokeWidth={ 1.5 } aria-hidden /> Customize</button>
+            </div>
+            { install_prompt && !is_standalone() && <div className="row">
+                <span>Install app<small>Its own window, a home-screen icon and an Add task shortcut.</small></span>
+                <button type="button" onClick={ async () => {
+                    await install_prompt.prompt()
+                    set_install_prompt( null )
+                } }
+                ><Download size={ 16 } strokeWidth={ 1.5 } aria-hidden /> Install</button>
+            </div> }
             { is_ios() && !is_standalone() && <div className="row" aria-label="Install on iPhone">
                 <span>
                     Install app
@@ -130,6 +150,10 @@ export default function SettingsPage() {
                 </button>
             </div>
         </Rows>
+        <Section>Keyboard shortcuts</Section>
+        <Rows>
+            <KeymapSection />
+        </Rows>
         <Section>Sync</Section>
         <Rows>
             <SyncSection />
@@ -139,6 +163,10 @@ export default function SettingsPage() {
             <div className="row">
                 <span>Completed tasks<small>History, with reopen.</small></span>
                 <Link to="/completed">Open</Link>
+            </div>
+            <div className="row">
+                <span>Labels<small>Every label and its tasks.</small></span>
+                <Link to="/labels">Open</Link>
             </div>
             <div className="row">
                 <span>Export<small>Everything, as one JSON file.</small></span>

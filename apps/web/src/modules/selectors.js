@@ -30,15 +30,29 @@ export const open_tasks = tasks => tasks.filter( is_open )
  * @returns {Array<object & { depth: number, path: string }>}
  */
 export const project_tree = projects => {
+
+    // Parent per project; unknown/deleted parents = top level
     const ids = new Set( projects.map( ( { id } ) => id ) )
-    const children = parent_id => projects.filter( project => ( ids.has( project.parent_id ) ? project.parent_id : null ) === parent_id )
-    const walk = ( parent_id, depth, prefix, seen ) => children( parent_id )
-        .filter( ( { id } ) => !seen.has( id ) )
-        .flatMap( project => {
-            const path = prefix ? `${ prefix }/${ project.name }` : project.name
-            return [ { ...project, depth, path }, ...walk( project.id, depth + 1, path, new Set( [ ...seen, project.id ] ) ) ]
-        } )
-    return walk( null, 0, ``, new Set() )
+    const parent_of = new Map( projects.map( ( { id, parent_id } ) => [ id, ids.has( parent_id ) ? parent_id : null ] ) )
+
+    // Two devices moving A under B and B under A offline merge into a loop: cut each loop at its smallest id,
+    // so every project stays reachable (and movable back out)
+    projects.forEach( ( { id } ) => {
+        const walk = []
+        let at = id
+        while( at && !walk.includes( at ) ) {
+            walk.push( at )
+            at = parent_of.get( at )
+        }
+        if( at ) parent_of.set( walk.slice( walk.indexOf( at ) ).sort()[ 0 ], null )
+    } )
+
+    const children = parent_id => projects.filter( ( { id } ) => parent_of.get( id ) === parent_id )
+    const walk = ( parent_id, depth, prefix ) => children( parent_id ).flatMap( project => {
+        const path = prefix ? `${ prefix }/${ project.name }` : project.name
+        return [ { ...project, depth, path }, ...walk( project.id, depth + 1, path ) ]
+    } )
+    return walk( null, 0, `` )
 }
 
 /**
@@ -75,3 +89,6 @@ export const visible_tree = ( tree, is_folded ) => {
         return [ { ...project, has_children: tree[ index + 1 ]?.depth > project.depth } ]
     } )
 }
+
+// Open top-level tasks carrying a label, by name
+export const label_tasks = ( tasks, name ) => tasks.filter( task => is_open( task ) && task.labels?.includes( name ) ).sort( by_soonest )

@@ -8,6 +8,8 @@ import CapturePage from '../components/pages/CapturePage'
 import SignInPage from '../components/pages/SignInPage'
 import ProjectsPage from '../components/pages/ProjectsPage'
 import ProjectPage from '../components/pages/ProjectPage'
+import LabelsPage from '../components/pages/LabelsPage'
+import LabelPage from '../components/pages/LabelPage'
 
 // Old routes forward with their query (?task= deep links keep opening the task)
 function Moved( { to } ) {
@@ -26,6 +28,8 @@ export default function AppRoutes() {
         <Route path="/horizons/:project_id" element={ <HorizonsPage /> } />
         <Route path="/projects" element={ <ProjectsPage /> } />
         <Route path="/projects/:id" element={ <ProjectPage /> } />
+        <Route path="/labels" element={ <LabelsPage /> } />
+        <Route path="/labels/:id" element={ <LabelPage /> } />
         <Route path="/search" element={ <SearchPage /> } />
         <Route path="/completed" element={ <CompletedPage /> } />
         <Route path="/settings" element={ <SettingsPage /> } />

@@ -49,3 +49,5 @@
 - Shell reads the store (project tree): StoreProvider must wrap Shell, routes still gated on `ready`.
 - e2e: add tasks via `e2e/ui.js` `add()` (sidebar Add task → modal, waits on the `quick-add-modal` draft clearing). Triage hides dated tasks by default — check dated tasks on Horizons/Search. `getByLabel('Deadline'|'Time')` needs exact (Deadline time input).
 - Grammar date sources contain capture groups: use named groups when adding groups to a rule regex.
+- Per-device UI prefs live in localStorage keys `dolist:keymap`, `dolist:sidebar`, `dolist:sidebar-collapsed`, `dolist:install-dismissed`; e2e contexts start clean, so tests see defaults.
+- `update_project` returns null on success, else a reason string (`missing|name|cycle|taken`) — not a boolean.

@@ -10,6 +10,8 @@ import TaskCard from '../molecules/TaskCard'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { open_tasks } from '../../modules/selectors'
 import { use_project_scope } from '../../hooks/use_project_scope'
+import { use_app_store } from '../../stores/app'
+import { combo_of } from '../../modules/keymap'
 
 // Cards rendered per lane before "Show more": keeps 10k-task boards light (plan §5)
 const PAGE = 50
@@ -100,9 +102,10 @@ export default function HorizonsPage() {
         set_dragging( task )
     }, [ tasks ] )
 
-    // M on any focused card opens the Move command
+    // The Move key (m by default, rebindable) on any focused card opens the Move command
+    const move_key = use_app_store( state => state.keymap.move )
     const on_page_key = event => {
-        if( event.key.toLowerCase() !== `m` || event.metaKey || event.ctrlKey || event.altKey ) return
+        if( combo_of( event ) !== move_key ) return
         if( /input|textarea|select/i.test( event.target.tagName ) ) return
         const card = event.target.closest?.( `[data-task-id]` )
         const task = card && tasks.find( ( { id } ) => id === card.dataset.taskId )
