@@ -1,10 +1,11 @@
 import { Fragment, useMemo } from 'react'
 import { NavLink } from 'react-router'
 import styled from 'styled-components'
-import { CircleCheck, Columns3, FolderTree, ListFilter, LogIn, Plus, Search, Settings } from 'lucide-react'
+import { ChevronDown, ChevronRight, CircleCheck, Columns3, FolderTree, ListFilter, LogIn, Plus, Search, Settings } from 'lucide-react'
 import { use_projects } from '@dolist/store/react'
 import { use_app_store } from '../../stores/app'
-import { project_tree } from '../../modules/selectors'
+import { project_tree, visible_tree } from '../../modules/selectors'
+import { use_collapsed } from '../../hooks/use_collapsed'
 
 const NAV = [
     { to: `/triage`, label: `Triage`, Icon: ListFilter },
@@ -42,9 +43,19 @@ const Nav = styled.nav`
     .add:focus-visible { box-shadow: 0 0 0 5px var(--accent-tint) }
     a.active { background: var(--accent-tint); color: var(--fg); font-weight: 600 }
 
-    /* Project trees under Horizons and Projects; indent per level (--depth) */
+    /* Project trees under Horizons and Projects; indent per level (--depth). A row = link + its fold chevron */
+    .row { position: relative; display: flex; flex-direction: column }
     a.sub { min-height: 36px; font-size: .9rem; padding-left: calc( 2.6rem + var(--depth) * .9rem ) }
     a.sub span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+    .fold {
+        position: absolute; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+        border: 0; border-radius: var(--radius-sm); background: none; color: var(--faint); cursor: pointer;
+    }
+    .fold:hover { background: var(--line-soft); color: var(--fg) }
+    .fold:focus-visible { box-shadow: 0 0 0 4px var(--accent-tint) }
+    .group > .fold { right: .35rem }
+    .sub-row > .fold { left: calc( 1.1rem + var(--depth) * .9rem ) }
+    .group > a { padding-right: 2.5rem }
     .bottom ~ .bottom { margin-top: 0 }
     .bottom { margin-top: auto }
 
@@ -62,8 +73,17 @@ const Nav = styled.nav`
         a.active { background: none }
         a.active::after { content: ""; position: absolute; inset: 0 25% auto; height: 3px; background: var(--accent); border-radius: 0 0 3px 3px }
         .bottom { margin-top: 0 }
+        .group { flex: 1; flex-direction: row }
+        .group > a { padding-right: .75rem }
     }
 `
+
+// Chevron that folds/unfolds a sidebar branch (desktop only; phones have no trees)
+const Fold = ( { open, name, on_toggle } ) => <button type="button" className="fold desktop-only" onClick={ on_toggle }
+    aria-expanded={ open } aria-label={ `${ open ? `Collapse` : `Expand` } ${ name }` }
+>
+    { open ? <ChevronDown size={ 16 } strokeWidth={ 1.75 } aria-hidden /> : <ChevronRight size={ 16 } strokeWidth={ 1.75 } aria-hidden /> }
+</button>
 
 // App frame: sidebar on desktop, bottom tabs on phones
 // Signed out, the sidebar offers Sign in (phones reach it through Settings)
@@ -74,6 +94,7 @@ export default function Shell( { children } ) {
     const open_quick_add = use_app_store( state => state.set_quick_add_open )
     const projects = use_projects()
     const tree = useMemo( () => project_tree( projects ), [ projects ] )
+    const [ collapsed, toggle ] = use_collapsed()
     const items = NAV.filter( item => !item.signed_out_only || !signed_in )
 
     return <Frame>
@@ -83,17 +104,33 @@ export default function Shell( { children } ) {
                 <Plus size={ 20 } strokeWidth={ 1.75 } aria-hidden />
                 <span>Add<span className="desktop-only"> task</span></span>
             </button>
-            { items.map( ( { to, label, Icon, desktop_only, bottom, tree: nested } ) => <Fragment key={ to }>
-                <NavLink to={ to } end={ nested } className={ [ desktop_only && `desktop-only`, bottom && `bottom` ].filter( Boolean ).join( ` ` ) || undefined }>
+            { items.map( ( { to, label, Icon, desktop_only, bottom, tree: nested } ) => {
+
+                const link = <NavLink to={ to } end={ nested } className={ [ desktop_only && `desktop-only`, bottom && `bottom` ].filter( Boolean ).join( ` ` ) || undefined }>
                     <Icon size={ 20 } strokeWidth={ 1.5 } aria-hidden />
                     <span>{ label }</span>
                 </NavLink>
-                { nested && tree.map( project => <NavLink key={ project.id } to={ `${ to }/${ project.id }` } className="sub desktop-only"
-                    style={ { '--depth': project.depth } } aria-label={ `${ label }: ${ project.path }` } title={ project.path }
-                >
-                    <span>{ project.name }</span>
-                </NavLink> ) }
-            </Fragment> ) }
+                if( !nested ) return <Fragment key={ to }>{ link }</Fragment>
+
+                // Fold keys: the whole group by its path, each project by group + id (Horizons and Projects fold independently)
+                const open = !collapsed.has( to )
+                const rows = open ? visible_tree( tree, id => collapsed.has( `${ to }/${ id }` ) ) : []
+
+                return <Fragment key={ to }>
+                    <div className="row group">
+                        { link }
+                        { !!tree.length && <Fold open={ open } name={ `${ label } list` } on_toggle={ () => toggle( to ) } /> }
+                    </div>
+                    { rows.map( project => <div key={ project.id } className="row sub-row desktop-only" style={ { '--depth': project.depth } }>
+                        <NavLink to={ `${ to }/${ project.id }` } className="sub" aria-label={ `${ label }: ${ project.path }` } title={ project.path }>
+                            <span>{ project.name }</span>
+                        </NavLink>
+                        { project.has_children && <Fold open={ !collapsed.has( `${ to }/${ project.id }` ) } name={ `${ label }: ${ project.path }` }
+                            on_toggle={ () => toggle( `${ to }/${ project.id }` ) }
+                        /> }
+                    </div> ) }
+                </Fragment>
+            } ) }
         </Nav>
         <div>{ children }</div>
     </Frame>

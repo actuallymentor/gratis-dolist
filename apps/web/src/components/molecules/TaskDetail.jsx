@@ -283,7 +283,7 @@ export default function TaskDetail( { task, on_close } ) {
 
             <dt><label htmlFor="d-project">Project</label></dt>
             <dd><select id="d-project" value={ task.project_id || `` } onChange={ ( { target: { value } } ) => save( { project_id: value || null } ) }>
-                <option value="">Inbox</option>
+                <option value="">No project</option>
                 { tree.map( ( { id, name, depth } ) => <option key={ id } value={ id }>{ `\u2003`.repeat( depth ) }{ name }</option> ) }
             </select></dd>
 

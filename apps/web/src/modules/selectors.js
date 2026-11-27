@@ -7,15 +7,15 @@ const by_soonest = ( a, b ) => {
 }
 
 /**
- * Triage: open tasks, minus the kinds switched off. Each flag = "include tasks that have this"
+ * Triage: open tasks; each flag on = keep only tasks that lack it (lacks.date = unscheduled)
  * @param {object[]} tasks
- * @param {{ date: boolean, deadline: boolean, project: boolean }} include
+ * @param {{ date: boolean, deadline: boolean, project: boolean }} lacks
  */
-export const triage_tasks = ( tasks, include ) => tasks
+export const triage_tasks = ( tasks, lacks ) => tasks
     .filter( task => is_open( task )
-        && ( include.date || !task.scheduled )
-        && ( include.deadline || !task.deadline )
-        && ( include.project || !task.project_id ) )
+        && !( lacks.date && task.scheduled )
+        && !( lacks.deadline && task.deadline )
+        && !( lacks.project && task.project_id ) )
     .sort( by_soonest )
 
 export const open_tasks = tasks => tasks.filter( is_open )
@@ -60,3 +60,18 @@ export const subtree_ids = ( projects, id ) => {
 
 // Open tasks in a project or any of its subprojects
 export const project_tasks = ( tasks, ids ) => tasks.filter( task => is_open( task ) && ids.has( task.project_id ) ).sort( by_soonest )
+
+/**
+ * A depth-first project tree minus the descendants of folded projects
+ * @param {Array<{ id: string, depth: number }>} tree - from project_tree
+ * @param {( id: string ) => boolean} is_folded
+ * @returns {Array<object & { has_children: boolean }>}
+ */
+export const visible_tree = ( tree, is_folded ) => {
+    let fold_depth = Infinity
+    return tree.flatMap( ( project, index ) => {
+        if( project.depth > fold_depth ) return []
+        fold_depth = is_folded( project.id ) ? project.depth : Infinity
+        return [ { ...project, has_children: tree[ index + 1 ]?.depth > project.depth } ]
+    } )
+}

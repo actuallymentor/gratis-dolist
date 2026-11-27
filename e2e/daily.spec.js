@@ -171,10 +171,10 @@ test( `Escape keeps detail edits`, async ( { page } ) => {
 } )
 
 test( `confirming a new project and label assigns them`, async ( { page } ) => {
-    await page.goto( `/triage?project=0` )
+    await page.goto( `/triage?no_project=1` )
     await add( page, `Prune roses #Garden @outside`, { create: true } )
 
-    // In a project, so this triage view (projects off) hides it; it carries the label
+    // In a project, so this triage view (No project on) hides it; it carries the label
     await expect( page.getByRole( `button`, { name: `Prune roses` } ) ).toHaveCount( 0 )
     await page.goto( `/search?q=roses` )
     const card = page.locator( `[data-task-id]` ).filter( { hasText: `Prune roses` } )

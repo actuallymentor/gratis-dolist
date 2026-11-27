@@ -321,3 +321,67 @@ export const ensure_project = ( store, path ) => {
     }, null )
 }
 
+
+// A project and every live descendant (cycle-safe)
+const subtree_of = ( store, id ) => {
+    const live = get_projects( store )
+    const ids = new Set( [ id ] )
+    let before = 0
+    while( before !== ids.size ) {
+        before = ids.size
+        live.forEach( project => ids.has( project.parent_id ) && ids.add( project.id ) )
+    }
+    return ids
+}
+
+/**
+ * Renames and/or moves a project. A name may not contain `/` (paths are quick-add syntax);
+ * a project can't move under itself or its own subprojects.
+ * @param {Object} store
+ * @param {string} id
+ * @param {{ name?: string, parent_id?: string|null }} fields
+ * @returns {boolean} false = unknown project, empty name, or a move into its own subtree
+ */
+export const update_project = ( store, id, { name, parent_id } = {} ) => {
+
+    if( !store.hasRow( `projects`, id ) ) return false
+    const clean = name === undefined ? undefined : clean_name( name ).replaceAll( `/`, ` ` ).trim()
+    if( clean === `` ) return false
+    if( parent_id && subtree_of( store, id ).has( parent_id ) ) return false
+
+    store.transaction( () => {
+        if( clean !== undefined ) store.setCell( `projects`, id, `name`, clean )
+        if( parent_id === null ) store.delCell( `projects`, id, `parent_id` )
+        else if( parent_id !== undefined ) store.setCell( `projects`, id, `parent_id`, parent_id )
+    } )
+    return true
+}
+
+/**
+ * Tombstones a project and its subprojects (one shared stamp, so restore_project brings back exactly those).
+ * Their tasks keep project_id: while deleted they read as unfiled (view), restored they're back in place.
+ * @param {Object} store
+ * @param {string} id
+ * @returns {number|null} the stamp (pass to restore_project), null = nothing deleted
+ */
+export const delete_project = ( store, id ) => {
+
+    if( !store.hasRow( `projects`, id ) || store.getCell( `projects`, id, `deleted_at` ) ) return null
+    const at = now_of( store )
+    store.transaction( () => subtree_of( store, id ).forEach( project_id => store.setCell( `projects`, project_id, `deleted_at`, at ) ) )
+    return at
+}
+
+/**
+ * Undoes delete_project: clears the tombstone of the project and of every project deleted with it.
+ * @param {Object} store
+ * @param {string} id
+ */
+export const restore_project = ( store, id ) => {
+
+    const at = store.getCell( `projects`, id, `deleted_at` )
+    if( !at ) return
+    store.transaction( () => store.forEachRow( `projects`, row_id => {
+        if( store.getCell( `projects`, row_id, `deleted_at` ) === at ) store.delCell( `projects`, row_id, `deleted_at` )
+    } ) )
+}

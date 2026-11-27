@@ -4,9 +4,9 @@ import { add } from './ui.js'
 // Triage filters, the sidebar Add task, shorthand search, deadline times
 
 const card = ( page, title ) => page.getByRole( `button`, { name: title, exact: true } )
-const toggle = ( page, name ) => page.getByRole( `group`, { name: `Show tasks that` } ).getByRole( `button`, { name } )
+const toggle = ( page, name ) => page.getByRole( `group`, { name: `Only tasks with` } ).getByRole( `button`, { name } )
 
-test( `triage: undated by default; toggles widen it and stick in the URL`, async ( { page } ) => {
+test( `triage: undated by default; "No …" toggles narrow it and stick in the URL`, async ( { page } ) => {
 
     await page.goto( `/triage` )
     await expect( page.getByRole( `textbox`, { name: `New task` } ) ).toHaveCount( 0 ) // no inline add bar
@@ -19,17 +19,20 @@ test( `triage: undated by default; toggles widen it and stick in the URL`, async
     await expect( card( page, `Garden plan` ) ).toBeVisible()
     await expect( card( page, `Dentist` ) ).toHaveCount( 0 )
     await expect( card( page, `Report` ) ).toHaveCount( 0 )
-    await expect( toggle( page, `Has project` ) ).toHaveAttribute( `aria-pressed`, `true` )
+    await expect( toggle( page, `No date` ) ).toHaveAttribute( `aria-pressed`, `true` )
+    await expect( toggle( page, `No project` ) ).toHaveAttribute( `aria-pressed`, `false` )
 
-    await toggle( page, `Has date` ).click()
+    await toggle( page, `No date` ).click()
     await expect( card( page, `Dentist` ) ).toBeVisible()
-    await toggle( page, `Has deadline` ).click()
+    await toggle( page, `No deadline` ).click()
     await expect( card( page, `Report` ) ).toBeVisible()
-    await toggle( page, `Has project` ).click()
+    await toggle( page, `No project` ).click()
     await expect( card( page, `Garden plan` ) ).toHaveCount( 0 )
+    await expect( card( page, `Loose idea` ) ).toBeVisible()
 
     await page.reload()
-    await expect( toggle( page, `Has date` ) ).toHaveAttribute( `aria-pressed`, `true` )
+    await expect( toggle( page, `No date` ) ).toHaveAttribute( `aria-pressed`, `false` )
+    await expect( toggle( page, `No project` ) ).toHaveAttribute( `aria-pressed`, `true` )
     await expect( card( page, `Garden plan` ) ).toHaveCount( 0 )
     await expect( card( page, `Report` ) ).toBeVisible()
 } )

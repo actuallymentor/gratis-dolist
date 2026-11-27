@@ -9,13 +9,14 @@ import TaskList from '../molecules/TaskList'
 import { use_task_actions } from '../../hooks/use_task_actions'
 import { triage_tasks } from '../../modules/selectors'
 
-// Each toggle includes tasks that have it. Default: nothing dated yet (projects welcome)
+// Each toggle keeps only tasks that lack it; all off = every open task. Default: nothing dated yet (projects welcome).
+// URL keys (?no_date=0) are new names, so links from the old "has" toggles can't silently mean the opposite
 const TOGGLES = [
-    [ `date`, `Has date`, false ],
-    [ `deadline`, `Has deadline`, false ],
-    [ `project`, `Has project`, true ],
+    [ `date`, `no_date`, `No date`, true ],
+    [ `deadline`, `no_deadline`, `No deadline`, true ],
+    [ `project`, `no_project`, `No project`, false ],
 ]
-const PARAMS = Object.fromEntries( TOGGLES.map( ( [ key, , fallback ] ) => [ key, withDefault( BooleanParam, fallback ) ] ) )
+const PARAMS = Object.fromEntries( TOGGLES.map( ( [ , param, , fallback ] ) => [ param, withDefault( BooleanParam, fallback ) ] ) )
 
 const Toggles = styled.div`
     display: flex; flex-wrap: wrap; gap: .4rem; margin: -.5rem 0 1.25rem;
@@ -37,19 +38,20 @@ export default function TriagePage() {
 
     const tasks = use_tasks()
     const { today, on_complete, on_open } = use_task_actions()
-    const [ include, set_include ] = useQueryParams( PARAMS )
-    const shown = useMemo( () => triage_tasks( tasks, include ), [ tasks, include ] )
+    const [ params, set_params ] = useQueryParams( PARAMS )
+    const lacks = useMemo( () => Object.fromEntries( TOGGLES.map( ( [ key, param ] ) => [ key, params[ param ] ] ) ), [ params ] )
+    const shown = useMemo( () => triage_tasks( tasks, lacks ), [ tasks, lacks ] )
 
     return <Page title="Triage">
-        <Toggles role="group" aria-label="Show tasks that">
-            { TOGGLES.map( ( [ key, label ] ) => <button key={ key } type="button" aria-pressed={ include[ key ] }
-                onClick={ () => set_include( { [ key ]: !include[ key ] }, `replaceIn` ) }
+        <Toggles role="group" aria-label="Only tasks with">
+            { TOGGLES.map( ( [ key, param, label ] ) => <button key={ key } type="button" aria-pressed={ lacks[ key ] }
+                onClick={ () => set_params( { [ param ]: !lacks[ key ] }, `replaceIn` ) }
             >
-                { include[ key ] && <Check size={ 14 } strokeWidth={ 2 } aria-hidden /> }{ label }
+                { lacks[ key ] && <Check size={ 14 } strokeWidth={ 2 } aria-hidden /> }{ label }
             </button> ) }
         </Toggles>
         <TaskList tasks={ shown } today={ today } on_complete={ on_complete } on_open={ on_open } empty={
-            <EmptyState icon={ ListFilter } title="Nothing to triage">Undated tasks land here. Toggle the filters above to widen the view.</EmptyState>
+            <EmptyState icon={ ListFilter } title="Nothing to triage">Undated tasks land here. Turn filters off above to widen the view.</EmptyState>
         }
         />
     </Page>

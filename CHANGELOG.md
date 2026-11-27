@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-27
+
+### Added
+- project CRUD: New project form on Projects (`Work/Clients` ok); Edit on a project page renames, moves (never into its own subtree), deletes with Undo
+- sidebar trees fold: chevron per group (Horizons, Projects) and per parent project, remembered per device
+
+### Changed
+- Triage toggles now narrow: No date / No deadline / No project (default: No date + No deadline); URL keys `no_date`, `no_deadline`, `no_project`
+- task detail: unfiled option reads "No project" (was "Inbox")
+
 ## 2026-11-26
 
 ### Added

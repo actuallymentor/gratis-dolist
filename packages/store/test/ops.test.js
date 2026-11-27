@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-    add_label, add_project, add_task, ensure_project, complete_task, completed_history, create_dolist_store, delete_task,
+    add_label, add_project, add_task, ensure_project, update_project, delete_project, restore_project, complete_task, completed_history, create_dolist_store, delete_task,
     get_labels, get_projects, get_task, get_tasks, restore_task, search_tasks, set_labels, uncomplete_task, update_task,
 } from '../src/index.js'
 
@@ -228,6 +228,49 @@ describe( `ensure_project`, () => {
         expect( home_clients ).not.toBe( clients )
         expect( get_projects( store ) ).toHaveLength( 4 )
         expect( ensure_project( store, ` / ` ) ).toBeNull()
+    } )
+
+} )
+
+describe( `project CRUD`, () => {
+
+    it( `renames and moves, refusing empty names and moves into its own subtree`, () => {
+        const { store } = make()
+        const clients = ensure_project( store, `Work/Clients` )
+        const work = store.getCell( `projects`, clients, `parent_id` )
+        const home = ensure_project( store, `Home` )
+
+        expect( update_project( store, clients, { name: ` #Big/clients ` } ) ).toBe( true )
+        expect( store.getCell( `projects`, clients, `name` ) ).toBe( `Big clients` )
+        expect( update_project( store, clients, { name: `  ` } ) ).toBe( false )
+        expect( update_project( store, work, { parent_id: clients } ) ).toBe( false )
+        expect( update_project( store, work, { parent_id: work } ) ).toBe( false )
+
+        expect( update_project( store, clients, { parent_id: home } ) ).toBe( true )
+        expect( store.getCell( `projects`, clients, `parent_id` ) ).toBe( home )
+        expect( update_project( store, clients, { parent_id: null } ) ).toBe( true )
+        expect( store.hasCell( `projects`, clients, `parent_id` ) ).toBe( false )
+        expect( update_project( store, `nope`, { name: `x` } ) ).toBe( false )
+    } )
+
+    it( `deletes a project with its subprojects; tasks read unfiled until restored`, () => {
+        const { store, tick } = make()
+        const clients = ensure_project( store, `Work/Clients` )
+        const work = store.getCell( `projects`, clients, `parent_id` )
+        const old = ensure_project( store, `Work/Old` )
+        delete_project( store, old )
+        tick()
+        const task = add_task( store, { title: `Invoice`, project_id: clients } )
+
+        delete_project( store, work )
+        expect( get_projects( store ) ).toHaveLength( 0 )
+        expect( get_task( store, task ).project_id ).toBeUndefined()
+
+        // Restore brings back what went together, not what was deleted earlier
+        restore_project( store, work )
+        expect( get_projects( store ).map( ( { name } ) => name ).sort() ).toEqual( [ `Clients`, `Work` ] )
+        expect( get_task( store, task ).project_id ).toBe( clients )
+        expect( delete_project( store, `nope` ) ).toBeNull()
     } )
 
 } )
